@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ZuhraGraph - Digital Art Commission Management
 
-## Getting Started
+ZuhraGraph is a complete backend platform for managing digital art commissions for a single artist. Built using Next.js (App Router), Prisma, PostgreSQL, Midtrans, and Cloudinary.
 
-First, run the development server:
+## Tech Stack
+- **Framework:** Next.js (App Router, TypeScript)
+- **Database:** PostgreSQL with Prisma ORM
+- **Authentication:** Auth.js (NextAuth) with JWT
+- **Payments:** Midtrans API
+- **Storage:** Cloudinary
+- **Architecture:** Clean Architecture with strong OOP principles
 
+## Setup and Installation
+
+### 1. Install Dependencies
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Environment Setup
+Copy the example `.env` file and fill in your details:
+```bash
+cp .env.example .env
+```
+Ensure you have a PostgreSQL database running and update `DATABASE_URL`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Database Setup (Prisma)
+Since this project uses Prisma 7, the connection URL is configured in `prisma.config.ts`. Set `DATABASE_URL` in your `.env`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+To run migrations and apply the schema:
+```bash
+npx prisma db push
+```
+*(Or use `npx prisma migrate dev` if you prefer migration history)*
 
-## Learn More
+### 4. Seed Database
+Seed the database with default Admin, Buyer, Packages, and Queue settings:
+```bash
+npx prisma db seed
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 5. Start Development Server
+```bash
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Architecture
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The project strictly follows **Clean Architecture** and **Dependency Injection**:
+- `src/domain`: Business rules, OOP Entities (User, Order, Payment), and Interfaces (PaymentGateway).
+- `src/application`: Use Cases and Services (OrderService).
+- `src/infrastructure`: External integrations (MidtransPaymentGateway, CloudinaryStorageService, Prisma Repositories).
+- `src/presentation`: Controllers processing HTTP Requests via Next.js Route Handlers.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For a detailed breakdown of Object-Oriented Programming (OOP) requirements, refer to `OOP_REPORT.md`.

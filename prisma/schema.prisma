@@ -1,0 +1,283 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  BUYER
+}
+
+enum OrderStatus {
+  PENDING
+  AWAITING_PAYMENT
+  PAID
+  CONFIRMED
+  PROCESSING
+  ARTWORK_UPLOADED
+  WAITING_BUYER_CONFIRMATION
+  REVISION_REQUESTED
+  PROCESSING_REVISION
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+enum NotificationType {
+  ORDER_CREATED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  ORDER_CONFIRMED
+  ARTWORK_UPLOADED
+  REVISION_REQUESTED
+  ORDER_COMPLETED
+  REVIEW_SUBMITTED
+  SYSTEM
+}
+
+enum ItemStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum RevisionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(BUYER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  orders              Order[]
+  notifications       Notification[]
+  activityDiscussions ActivityDiscussion[]
+  reviews             Review[]
+  auditLogs           AuditLog[]
+
+  @@map("users")
+}
+
+model Portfolio {
+  id          String     @id @default(uuid())
+  title       String
+  description String?
+  imageUrl    String     @map("image_url")
+  status      ItemStatus @default(ACTIVE)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at")
+
+  @@map("portfolios")
+}
+
+model Package {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal    @db.Decimal(10, 2)
+  status      ItemStatus @default(ACTIVE)
+  slot        Int        @default(1)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at")
+
+  orders Order[]
+
+  @@map("packages")
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  buyerId     String      @map("buyer_id")
+  packageId   String      @map("package_id")
+  status      OrderStatus @default(PENDING)
+  totalAmount Decimal     @map("total_amount") @db.Decimal(10, 2)
+  brief       String
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  deletedAt   DateTime?   @map("deleted_at")
+
+  buyer               User                 @relation(fields: [buyerId], references: [id])
+  package             Package              @relation(fields: [packageId], references: [id])
+  payments            Payment[]
+  revisionRequests    RevisionRequest[]
+  artworkVersions     ArtworkVersion[]
+  activityDiscussions ActivityDiscussion[]
+  statusHistories     OrderStatusHistory[]
+  review              Review?
+
+  @@index([buyerId])
+  @@index([packageId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  orderId       String        @map("order_id")
+  amount        Decimal       @db.Decimal(10, 2)
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       @map("transaction_id")
+  token         String?
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  deletedAt     DateTime?     @map("deleted_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([transactionId])
+  @@index([status])
+  @@map("payments")
+}
+
+model RevisionRequest {
+  id            String         @id @default(uuid())
+  orderId       String         @map("order_id")
+  revisionCount Int            @map("revision_count")
+  description   String
+  status        RevisionStatus @default(PENDING)
+  extraFee      Decimal        @default(0) @map("extra_fee") @db.Decimal(10, 2)
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+  deletedAt     DateTime?      @map("deleted_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+  @@map("revision_requests")
+}
+
+model ArtworkVersion {
+  id             String   @id @default(uuid())
+  orderId        String   @map("order_id")
+  url            String
+  revisionNumber Int      @default(0) @map("revision_number")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@map("artwork_versions")
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  userId    String             @map("user_id")
+  type      NotificationType
+  content   String
+  status    NotificationStatus @default(UNREAD)
+  createdAt DateTime           @default(now()) @map("created_at")
+  deletedAt DateTime?          @map("deleted_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("notifications")
+}
+
+model ActivityDiscussion {
+  id        String    @id @default(uuid())
+  orderId   String    @map("order_id")
+  userId    String    @map("user_id")
+  message   String
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([userId])
+  @@map("activity_discussions")
+}
+
+model Review {
+  id        String    @id @default(uuid())
+  orderId   String    @unique @map("order_id")
+  userId    String    @map("user_id")
+  rating    Int
+  feedback  String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@map("reviews")
+}
+
+model Queue {
+  id          String   @id @default(uuid())
+  currentSlot Int      @default(0) @map("current_slot")
+  maxSlot     Int      @default(10) @map("max_slot")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("queues")
+}
+
+model FAQ {
+  id        String    @id @default(uuid())
+  question  String
+  answer    String
+  order     Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  @@map("faqs")
+}
+
+model OrderStatusHistory {
+  id        String      @id @default(uuid())
+  orderId   String      @map("order_id")
+  status    OrderStatus
+  changedAt DateTime    @default(now()) @map("changed_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([status])
+  @@map("order_status_histories")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid())
+  userId       String?  @map("user_id")
+  activityType String   @map("activity_type")
+  entityType   String?  @map("entity_type")
+  entityId     String?  @map("entity_id")
+  detail       String?
+  timestamp    DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
