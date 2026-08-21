@@ -1,26 +1,40 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@theme {
+  --color-background: #F5F1EA;
+  --color-surface: #FCFAF7;
+  --color-primary: #242321;
+  --color-secondary: #706C65;
+  --color-accent: #B85C45;
+  --color-accent-hover: #964936;
+  --color-border-line: #DDD7CE;
+  
+  --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+  
+  /* Font Families from Stitch */
+  --font-caption: var(--font-geist-sans);
+  --font-body-lg: var(--font-geist-sans);
+  --font-headline-lg: var(--font-geist-sans);
+  --font-display-lg: var(--font-geist-sans);
+  --font-label-md: var(--font-geist-sans);
+  --font-headline-md: var(--font-geist-sans);
+  --font-body-md: var(--font-geist-sans);
+  --font-display-lg-mobile: var(--font-geist-sans);
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Spacing */
+  --spacing-container-max: 1280px;
+  --spacing-unit: 8px;
+  --spacing-gutter: 24px;
+  --spacing-section-gap: 120px;
+  --spacing-margin-mobile: 20px;
+  --spacing-margin-desktop: 64px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-primary);
+  font-family: var(--font-sans);
+  @apply antialiased min-h-screen flex flex-col;
 }
+

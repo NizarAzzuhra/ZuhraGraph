@@ -2,17 +2,31 @@ import { Order } from '../../domain/entities/Order';
 import { OrderRepository } from '../../domain/interfaces/OrderRepository';
 import { PaymentGateway } from '../../domain/interfaces/PaymentGateway';
 import { NotificationService } from '../../domain/interfaces/NotificationService';
+import { PackageRepository } from '../../domain/interfaces/PackageRepository';
+import { Payment } from '../../domain/entities/Payment';
+import { PaymentRepository } from '../../domain/interfaces/PaymentRepository';
 import { v4 as uuidv4 } from 'uuid';
 
 export class OrderService {
   // Dependency Injection via constructor
   constructor(
     private readonly orderRepository: OrderRepository,
+    private readonly packageRepository: PackageRepository,
+    private readonly paymentRepository: PaymentRepository,
     private readonly paymentGateway: PaymentGateway,
     private readonly notificationService: NotificationService
   ) {}
 
-  public async createOrder(buyerId: string, packageId: string, amount: number, brief: string, buyerInfo: any) {
+  public async createOrder(buyerId: string, packageId: string, brief: string, buyerInfo: any) {
+    const pkg = await this.packageRepository.findById(packageId);
+    if (!pkg) {
+      throw new Error('Package not found');
+    }
+    if (pkg.status !== 'ACTIVE') {
+      throw new Error('Package is not active');
+    }
+    const amount = pkg.price;
+
     // 1. Create domain entity (Status starts as PENDING implicitly in constructor)
     const order = new Order(uuidv4(), buyerId, packageId, amount, brief);
     
@@ -22,10 +36,16 @@ export class OrderService {
     // 3. Persist entity
     await this.orderRepository.save(order);
 
-    // 4. Initiate payment
+    // 4. Create Payment domain entity
+    const payment = new Payment(uuidv4(), order.id, amount, 'PENDING', null);
+
+    // 5. Save Payment
+    await this.paymentRepository.save(payment);
+
+    // 6. Initiate payment
     const paymentInfo = await this.paymentGateway.initiatePayment(order.id, amount, buyerInfo);
 
-    // 5. Send notification
+    // 7. Send notification
     await this.notificationService.sendNotification(buyerId, 'ORDER_CREATED', `Order ${order.id} created. Please complete payment.`);
 
     return { order, paymentInfo };
@@ -39,9 +59,6 @@ export class OrderService {
 
     order.markAsPaid();
     await this.orderRepository.save(order);
-    
-    // NOTE: transactionId is currently not persisted because the existing 
-    // OrderRepository and database schema do not support storing it yet.
     
     await this.notificationService.sendNotification(order.buyerId, 'PAYMENT_SUCCESS', `Payment for order ${order.id} was successful.`);
   }
