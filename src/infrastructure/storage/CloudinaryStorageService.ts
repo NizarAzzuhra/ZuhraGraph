@@ -1,14 +1,8 @@
 import { StorageService, UploadResult } from '../../domain/interfaces/StorageService';
-import { v2 as cloudinary } from 'cloudinary';
+import cloudinary from '../../config/cloudinary';
 
 export class CloudinaryStorageService implements StorageService {
-  constructor() {
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dummy_cloud',
-      api_key: process.env.CLOUDINARY_API_KEY || 'dummy_key',
-      api_secret: process.env.CLOUDINARY_API_SECRET || 'dummy_secret',
-    });
-  }
+  constructor() {}
 
   public async uploadImage(fileBuffer: Buffer, folder: string): Promise<UploadResult> {
     return new Promise((resolve, reject) => {

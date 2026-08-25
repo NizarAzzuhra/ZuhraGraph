@@ -6,19 +6,33 @@ export class Payment {
   public readonly amount: number;
   protected status: PaymentStatus;
   private transactionId: string | null;
+  private token: string | null;
+  public readonly updatedAt?: Date;
 
   constructor(
     id: string,
     orderId: string,
     amount: number,
     status: PaymentStatus = 'PENDING',
-    transactionId: string | null = null
+    transactionId: string | null = null,
+    token: string | null = null,
+    updatedAt?: Date
   ) {
     this.id = id;
     this.orderId = orderId;
     this.amount = amount;
     this.status = status;
     this.transactionId = transactionId;
+    this.token = token;
+    this.updatedAt = updatedAt;
+  }
+
+  public getToken(): string | null {
+    return this.token;
+  }
+
+  public setToken(token: string): void {
+    this.token = token;
   }
 
   public getStatus(): PaymentStatus {

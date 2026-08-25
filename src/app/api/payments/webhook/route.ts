@@ -51,14 +51,22 @@ export async function POST(req: Request) {
     }
 
     // 3. Find Order and Payment
-    const order = await orderRepository.findById(order_id);
-    if (!order) {
-      return NextResponse.json({ success: false, message: 'Order not found' }, { status: 404 });
+    let payment = await paymentRepository.findById(order_id);
+    let order: any = null;
+
+    if (payment) {
+      // Strategy B: payload.order_id is Payment.id
+      order = await orderRepository.findById(payment.orderId);
+    } else {
+      // Legacy Strategy A Fallback: payload.order_id is Order.id
+      order = await orderRepository.findById(order_id);
+      if (order) {
+        payment = await paymentRepository.findByOrderId(order.id);
+      }
     }
 
-    const payment = await paymentRepository.findByOrderId(order_id);
-    if (!payment) {
-      return NextResponse.json({ success: false, message: 'Payment not found' }, { status: 404 });
+    if (!payment || !order) {
+      return NextResponse.json({ success: false, message: 'Order or Payment not found' }, { status: 404 });
     }
 
     // 4. Validate Amount

@@ -17,7 +17,9 @@ export class PrismaPaymentRepository implements PaymentRepository {
       data.orderId,
       data.amount.toNumber(),
       data.status as PaymentStatus,
-      data.transactionId
+      data.transactionId,
+      data.token,
+      data.updatedAt
     );
   }
 
@@ -36,8 +38,27 @@ export class PrismaPaymentRepository implements PaymentRepository {
       data.orderId,
       data.amount.toNumber(),
       data.status as PaymentStatus,
-      data.transactionId
+      data.transactionId,
+      data.token,
+      data.updatedAt
     );
+  }
+
+  public async findAllByOrderId(orderId: string): Promise<Payment[]> {
+    const data = await prisma.payment.findMany({
+      where: { orderId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return data.map(d => new Payment(
+      d.id,
+      d.orderId,
+      d.amount.toNumber(),
+      d.status as PaymentStatus,
+      d.transactionId,
+      d.token,
+      d.updatedAt
+    ));
   }
 
   public async save(payment: Payment): Promise<void> {
@@ -48,6 +69,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
       update: {
         status: payment.getStatus(),
         transactionId: payment.getTransactionId(),
+        token: payment.getToken(),
       },
       create: {
         id: payment.id,
@@ -55,6 +77,7 @@ export class PrismaPaymentRepository implements PaymentRepository {
         amount: payment.amount,
         status: payment.getStatus(),
         transactionId: payment.getTransactionId(),
+        token: payment.getToken(),
       },
     });
   }

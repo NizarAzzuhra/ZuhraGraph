@@ -17,7 +17,7 @@ export class Order {
   public readonly packageId: string;
   protected status: OrderStatus;
   public totalAmount: number;
-  public readonly brief: string;
+  public brief: string;
   public readonly createdAt: Date;
 
   constructor(
@@ -89,6 +89,13 @@ export class Order {
       throw new Error('Order must be waiting for buyer confirmation to request a revision.');
     }
     this.status = 'REVISION_REQUESTED';
+  }
+
+  public revertToWaitingBuyerConfirmation(): void {
+    if (this.status !== 'REVISION_REQUESTED') {
+      throw new Error('Order must be in REVISION_REQUESTED state to revert.');
+    }
+    this.status = 'WAITING_BUYER_CONFIRMATION';
   }
 
   public startRevision(): void {

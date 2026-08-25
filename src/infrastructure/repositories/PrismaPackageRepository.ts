@@ -1,16 +1,6 @@
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
 import { Package } from '../../domain/entities/Package';
 import { PackageRepository } from '../../domain/interfaces/PackageRepository';
-
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error('DATABASE_URL is not configured.');
-}
-
-const adapter = new PrismaPg({ connectionString });
-const prisma = new PrismaClient({ adapter });
 
 export class PrismaPackageRepository implements PackageRepository {
   public async findById(id: string): Promise<Package | null> {

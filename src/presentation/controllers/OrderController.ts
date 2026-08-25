@@ -27,7 +27,18 @@ const orderService = new OrderService(orderRepository, packageRepository, paymen
 
 const createOrderSchema = z.object({
   packageId: z.string().uuid("Invalid package ID"),
-  brief: z.string().min(1, "Brief commission is required and cannot be empty"),
+  brief: z.string().refine((val) => {
+    try {
+      const parsed = JSON.parse(val);
+      if (!parsed.description || parsed.description.trim() === '') return false;
+      if (parsed.description.length > 1000) return false;
+      if (!parsed.characterReferences || !Array.isArray(parsed.characterReferences) || parsed.characterReferences.length === 0) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Format brief tidak valid. Pastikan deskripsi tidak kosong, tidak lebih dari 1000 karakter, dan minimal menyertakan 1 referensi karakter."),
+  termsAccepted: z.boolean().refine(val => val === true, "Persetujuan Ketentuan Layanan wajib diberikan."),
   buyerInfo: z.any().optional()
 });
 
@@ -69,6 +80,36 @@ export class OrderController {
       if (error.message === 'Package is not active') {
         return NextResponse.json({ success: false, message: error.message }, { status: 400 });
       }
+      return NextResponse.json({
+        success: false,
+        message: error.message || 'Internal Server Error'
+      }, { status: 500 });
+    }
+  }
+
+  static async getOrders(req: Request) {
+    try {
+      const session = await getServerSession(authOptions);
+      
+      if (!session || !session.user || !(session.user as any).id) {
+        return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+      }
+
+      const role = (session.user as any).role;
+      const userId = (session.user as any).id;
+
+      let orders;
+      if (role === 'ADMIN') {
+        orders = await orderService.getAllOrders();
+      } else {
+        orders = await orderService.getBuyerOrders(userId);
+      }
+
+      return NextResponse.json({
+        success: true,
+        data: orders
+      }, { status: 200 });
+    } catch (error: any) {
       return NextResponse.json({
         success: false,
         message: error.message || 'Internal Server Error'

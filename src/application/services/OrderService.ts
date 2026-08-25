@@ -25,6 +25,20 @@ export class OrderService {
     if (pkg.status !== 'ACTIVE') {
       throw new Error('Package is not active');
     }
+    if (!brief || brief.trim() === '') {
+      throw new Error('Brief cannot be empty');
+    }
+
+    // Anti-double submission check (10 seconds window)
+    const tenSecondsAgo = new Date(Date.now() - 10000);
+    const recentOrders = await this.orderRepository.findAllByBuyerId(buyerId);
+    if (recentOrders && recentOrders.length > 0) {
+      const duplicate = recentOrders.find((o: any) => o.packageId === packageId && o.createdAt >= tenSecondsAgo);
+      if (duplicate) {
+        throw new Error('Duplicate order detected. Please wait a moment before creating another order.');
+      }
+    }
+
     const amount = pkg.price;
 
     // 1. Create domain entity (Status starts as PENDING implicitly in constructor)
@@ -36,19 +50,29 @@ export class OrderService {
     // 3. Persist entity
     await this.orderRepository.save(order);
 
-    // 4. Create Payment domain entity
+    // 4. Create Payment domain entity and save BEFORE Midtrans call
     const payment = new Payment(uuidv4(), order.id, amount, 'PENDING', null);
-
-    // 5. Save Payment
     await this.paymentRepository.save(payment);
 
-    // 6. Initiate payment
-    const paymentInfo = await this.paymentGateway.initiatePayment(order.id, amount, buyerInfo);
+    // 5. Initiate payment using Payment.id as Midtrans order_id
+    let paymentInfo = null;
+    let paymentError = false;
+    try {
+      paymentInfo = await this.paymentGateway.initiatePayment(payment.id, amount, buyerInfo);
+      
+      // 6. Set token and Save Payment again if successful
+      payment.setToken(paymentInfo.token);
+      await this.paymentRepository.save(payment);
+    } catch (error) {
+      console.error('Midtrans initiation failed during create order:', error);
+      paymentError = true;
+      // Order and Payment are already saved. We return partial success.
+    }
 
     // 7. Send notification
     await this.notificationService.sendNotification(buyerId, 'ORDER_CREATED', `Order ${order.id} created. Please complete payment.`);
 
-    return { order, paymentInfo };
+    return { order, paymentInfo, paymentError };
   }
 
   public async handlePaymentSuccess(orderId: string, transactionId: string): Promise<void> {
@@ -125,5 +149,34 @@ export class OrderService {
     await this.orderRepository.save(order);
     
     return order;
+  }
+
+  public async getOrderDetails(orderId: string, buyerId: string) {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) {
+      throw new Error('Order not found');
+    }
+    
+    if (order.buyerId !== buyerId) {
+      throw new Error('Unauthorized access to order');
+    }
+
+    const packageData = await this.packageRepository.findById(order.packageId);
+    if (!packageData) {
+      throw new Error('Package associated with order not found');
+    }
+
+    return {
+      order,
+      package: packageData
+    };
+  }
+
+  public async getBuyerOrders(buyerId: string) {
+    return this.orderRepository.findListByBuyerId(buyerId);
+  }
+
+  public async getAllOrders() {
+    return this.orderRepository.findAllList();
   }
 }

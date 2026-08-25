@@ -56,6 +56,18 @@ enum RevisionStatus {
   REJECTED
 }
 
+enum BriefEditStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum RevisionClassification {
+  CORRECTION
+  REVISION
+  SCOPE_CHANGE
+}
+
 enum NotificationStatus {
   UNREAD
   READ
@@ -69,6 +81,7 @@ model User {
   role         Role     @default(BUYER)
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  deletedAt    DateTime?  @map("deleted_at")
 
   orders              Order[]
   notifications       Notification[]
@@ -127,6 +140,7 @@ model Order {
   activityDiscussions ActivityDiscussion[]
   statusHistories     OrderStatusHistory[]
   review              Review?
+  briefEditRequests   BriefEditRequest[]
 
   @@index([buyerId])
   @@index([packageId])
@@ -155,17 +169,22 @@ model Payment {
 }
 
 model RevisionRequest {
-  id            String         @id @default(uuid())
-  orderId       String         @map("order_id")
-  revisionCount Int            @map("revision_count")
+  id            String                  @id @default(uuid())
+  orderId       String                  @map("order_id")
+  revisionCount Int                     @map("revision_count")
   description   String
-  status        RevisionStatus @default(PENDING)
-  extraFee      Decimal        @default(0) @map("extra_fee") @db.Decimal(10, 2)
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
-  deletedAt     DateTime?      @map("deleted_at")
+  status        RevisionStatus          @default(PENDING)
+  extraFee      Decimal                 @default(0) @map("extra_fee") @db.Decimal(10, 2)
+  classification RevisionClassification?
+  requester     Role                    @default(BUYER)
+  reason        String?                 @db.Text
+  artworkVersionId String?              @map("artwork_version_id")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+  deletedAt     DateTime?               @map("deleted_at")
 
   order Order @relation(fields: [orderId], references: [id])
+  artworkVersion ArtworkVersion? @relation(fields: [artworkVersionId], references: [id], onDelete: SetNull)
 
   @@index([orderId])
   @@index([status])
@@ -180,9 +199,27 @@ model ArtworkVersion {
   createdAt      DateTime @default(now()) @map("created_at")
 
   order Order @relation(fields: [orderId], references: [id])
+  revisionRequests RevisionRequest[]
 
   @@index([orderId])
   @@map("artwork_versions")
+}
+
+model BriefEditRequest {
+  id            String          @id @default(uuid())
+  orderId       String          @map("order_id")
+  proposedBrief String          @db.Text
+  status        BriefEditStatus @default(PENDING)
+  reason        String?         @db.Text
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+  deletedAt     DateTime?       @map("deleted_at")
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([status])
+  @@map("brief_edit_requests")
 }
 
 model Notification {

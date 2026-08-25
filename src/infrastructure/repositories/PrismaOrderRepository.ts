@@ -1,23 +1,9 @@
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
-
+import { prisma } from '../../lib/prisma';
 import { Order } from '../../domain/entities/Order';
 import { OrderRepository } from '../../domain/interfaces/OrderRepository';
 import { OrderStatus } from '../../domain/entities/Order';
-
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error('DATABASE_URL is not configured.');
-}
-
-const adapter = new PrismaPg({
-  connectionString,
-});
-
-const prisma = new PrismaClient({
-  adapter,
-});
+import { OrderSummaryDTO } from '../../domain/interfaces/OrderSummaryDTO';
+import { PaymentStatus } from '../../domain/entities/Payment';
 
 export class PrismaOrderRepository implements OrderRepository {
   public async findById(id: string): Promise<Order | null> {
@@ -86,5 +72,57 @@ export class PrismaOrderRepository implements OrderRepository {
           d.createdAt
         )
     );
+  }
+
+  private mapToSummaryDTO(data: any): OrderSummaryDTO {
+    return {
+      id: data.id,
+      packageId: data.packageId,
+      packageName: data.package.name,
+      buyerName: data.buyer.name,
+      buyerEmail: data.buyer.email,
+      totalAmount: data.totalAmount.toNumber(),
+      status: data.status as OrderStatus,
+      paymentStatus: data.payments && data.payments.length > 0 
+        ? data.payments[0].status as PaymentStatus 
+        : null,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    };
+  }
+
+  public async findListByBuyerId(buyerId: string): Promise<OrderSummaryDTO[]> {
+    const data = await prisma.order.findMany({
+      where: { buyerId },
+      include: {
+        package: { select: { name: true } },
+        buyer: { select: { name: true, email: true } },
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { status: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return data.map(this.mapToSummaryDTO);
+  }
+
+  public async findAllList(): Promise<OrderSummaryDTO[]> {
+    const data = await prisma.order.findMany({
+      include: {
+        package: { select: { name: true } },
+        buyer: { select: { name: true, email: true } },
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { status: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return data.map(this.mapToSummaryDTO);
   }
 }
