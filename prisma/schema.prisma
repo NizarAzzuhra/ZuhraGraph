@@ -52,8 +52,16 @@ enum ItemStatus {
 
 enum RevisionStatus {
   PENDING
-  APPROVED
+  APPROVED_FREE
+  REQUIRES_PAYMENT
+  APPROVED_PAID
   REJECTED
+}
+
+enum BuyerDecision {
+  PENDING
+  ACCEPTED
+  DECLINED
 }
 
 enum BriefEditStatus {
@@ -63,8 +71,8 @@ enum BriefEditStatus {
 }
 
 enum RevisionClassification {
-  CORRECTION
-  REVISION
+  ARTIST_ERROR
+  MINOR_REVISION
   SCOPE_CHANGE
 }
 
@@ -96,7 +104,8 @@ model Portfolio {
   id          String     @id @default(uuid())
   title       String
   description String?
-  imageUrl    String     @map("image_url")
+  imageUrl    String?    @map("image_url")
+  category    String?
   status      ItemStatus @default(ACTIVE)
   createdAt   DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
@@ -109,10 +118,13 @@ model Package {
   id          String     @id @default(uuid())
   name        String
   description String?
-  price       Decimal    @db.Decimal(10, 2)
-  status      ItemStatus @default(ACTIVE)
-  slot        Int        @default(1)
-  createdAt   DateTime   @default(now()) @map("created_at")
+  price             Decimal    @db.Decimal(10, 2)
+  status            ItemStatus @default(ACTIVE)
+  slot              Int        @default(1)
+  maxActiveSlots    Int        @default(3) @map("max_active_slots")
+  isAcceptingOrders Boolean    @default(true) @map("is_accepting_orders")
+  imageUrl          String?    @map("image_url")
+  createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
   deletedAt   DateTime?  @map("deleted_at")
 
@@ -178,6 +190,7 @@ model RevisionRequest {
   classification RevisionClassification?
   requester     Role                    @default(BUYER)
   reason        String?                 @db.Text
+  buyerDecision BuyerDecision?          @map("buyer_decision")
   artworkVersionId String?              @map("artwork_version_id")
   createdAt     DateTime                @default(now()) @map("created_at")
   updatedAt     DateTime                @updatedAt @map("updated_at")
@@ -227,6 +240,7 @@ model Notification {
   userId    String             @map("user_id")
   type      NotificationType
   content   String
+  link      String?
   status    NotificationStatus @default(UNREAD)
   createdAt DateTime           @default(now()) @map("created_at")
   deletedAt DateTime?          @map("deleted_at")

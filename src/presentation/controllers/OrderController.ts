@@ -10,18 +10,13 @@ import { MidtransPaymentGateway } from '../../infrastructure/payment/MidtransPay
 
 // In a real DI setup (like InversifyJS or NestJS), these would be injected automatically.
 // For Next.js App Router, we manually wire them up in the controller or a DI container file.
-class MockNotificationService {
-  async sendNotification(userId: string, type: string, content: string) {
-    console.log(`Notification to ${userId}: [${type}] ${content}`);
-  }
-  async markAsRead(notificationId: string) {}
-}
+import { PrismaNotificationService } from '../../infrastructure/services/PrismaNotificationService';
 
 const orderRepository = new PrismaOrderRepository();
 const packageRepository = new PrismaPackageRepository();
 const paymentRepository = new PrismaPaymentRepository();
 const paymentGateway = new MidtransPaymentGateway();
-const notificationService = new MockNotificationService();
+const notificationService = new PrismaNotificationService();
 
 const orderService = new OrderService(orderRepository, packageRepository, paymentRepository, paymentGateway, notificationService);
 

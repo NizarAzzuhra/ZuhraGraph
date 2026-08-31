@@ -1,5 +1,6 @@
-export type RevisionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
-export type RevisionClassification = 'CORRECTION' | 'REVISION' | 'SCOPE_CHANGE';
+export type RevisionStatus = 'PENDING' | 'APPROVED_FREE' | 'REQUIRES_PAYMENT' | 'APPROVED_PAID' | 'REJECTED';
+export type RevisionClassification = 'ARTIST_ERROR' | 'MINOR_REVISION' | 'SCOPE_CHANGE';
+export type BuyerDecision = 'PENDING' | 'ACCEPTED' | 'DECLINED';
 
 export class RevisionRequest {
   public readonly id: string;
@@ -11,6 +12,7 @@ export class RevisionRequest {
   public classification: RevisionClassification | null;
   public readonly requester: 'BUYER' | 'ADMIN';
   public reason: string | null;
+  public buyerDecision: BuyerDecision | null;
   public readonly artworkVersionId: string | null;
   public readonly createdAt: Date;
   public readonly updatedAt: Date;
@@ -25,6 +27,7 @@ export class RevisionRequest {
     classification: RevisionClassification | null = null,
     requester: 'BUYER' | 'ADMIN' = 'BUYER',
     reason: string | null = null,
+    buyerDecision: BuyerDecision | null = null,
     artworkVersionId: string | null = null,
     createdAt: Date = new Date(),
     updatedAt: Date = new Date()
@@ -38,6 +41,7 @@ export class RevisionRequest {
     this.classification = classification;
     this.requester = requester;
     this.reason = reason;
+    this.buyerDecision = buyerDecision;
     this.artworkVersionId = artworkVersionId;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
@@ -47,6 +51,10 @@ export class RevisionRequest {
     return this.status;
   }
 
+  public setStatus(status: RevisionStatus): void {
+    this.status = status;
+  }
+
   public approve(
     classification: RevisionClassification,
     extraFee: number,
@@ -54,13 +62,20 @@ export class RevisionRequest {
     reason?: string
   ): void {
     if (this.status !== 'PENDING') {
-      throw new Error('Hanya permintaan revisi berstatus PENDING yang dapat disetujui.');
+      throw new Error('Hanya permintaan revisi berstatus PENDING yang dapat diproses.');
     }
-    this.status = 'APPROVED';
+    
     this.classification = classification;
     this.extraFee = extraFee;
-    // For corrections, revision count should be 0.
     this.reason = reason || null;
+
+    if (extraFee > 0) {
+      this.status = 'REQUIRES_PAYMENT';
+      this.buyerDecision = 'PENDING';
+    } else {
+      this.status = 'APPROVED_FREE';
+      this.buyerDecision = null;
+    }
   }
 
   public reject(reason: string): void {
@@ -72,5 +87,21 @@ export class RevisionRequest {
     }
     this.status = 'REJECTED';
     this.reason = reason;
+  }
+
+  public acceptPaidRevision(): void {
+    if (this.status !== 'REQUIRES_PAYMENT') {
+      throw new Error('Permintaan revisi tidak dalam status menunggu pembayaran.');
+    }
+    this.status = 'APPROVED_PAID';
+    this.buyerDecision = 'ACCEPTED';
+  }
+
+  public declinePaidRevision(): void {
+    if (this.status !== 'REQUIRES_PAYMENT') {
+      throw new Error('Permintaan revisi tidak dalam status menunggu pembayaran.');
+    }
+    this.status = 'REJECTED';
+    this.buyerDecision = 'DECLINED';
   }
 }

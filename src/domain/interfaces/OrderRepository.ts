@@ -6,4 +6,7 @@ export interface OrderRepository {
   findAllByBuyerId(buyerId: string): Promise<Order[]>;
   findListByBuyerId(buyerId: string): Promise<import('./OrderSummaryDTO').OrderSummaryDTO[]>;
   findAllList(): Promise<import('./OrderSummaryDTO').OrderSummaryDTO[]>;
+  findAllForAdmin(): Promise<any[]>;
+  addArtwork(orderId: string, url: string, revisionNumber: number): Promise<void>;
+  getArtworkCount(orderId: string): Promise<number>;
 }

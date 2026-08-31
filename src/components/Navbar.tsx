@@ -11,6 +11,53 @@ export function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  
+  const notificationRef = React.useRef<HTMLDivElement>(null);
+  const profileRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (status !== 'authenticated') return;
+    const fetchNotifications = async () => {
+      try {
+        const res = await fetch('/api/notifications');
+        const data = await res.json();
+        if (data.success) {
+          setUnreadCount(data.unreadCount || 0);
+          setNotifications(data.data || []);
+        }
+      } catch (e) {}
+    };
+
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 15000);
+    return () => clearInterval(interval);
+  }, [status]);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setNotificationDropdownOpen(false);
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const markAllAsRead = async () => {
+    try {
+      const res = await fetch('/api/notifications', { method: 'PATCH' });
+      if (res.ok) {
+        setUnreadCount(0);
+        setNotifications(prev => prev.map(n => ({ ...n, status: 'READ' })));
+      }
+    } catch (e) {}
+  };
 
   const isActive = (path: string) => {
     if (path === '/' && pathname !== '/') return false;
@@ -18,17 +65,17 @@ export function Navbar() {
   };
 
   const navLinkClass = (path: string) => `
-    text-label-md font-label-md transition-colors duration-200
+    text-sm font-semibold transition-colors duration-200
     ${isActive(path) 
-      ? 'text-[var(--color-primary)] font-bold border-b-2 border-[var(--color-accent)] pb-1' 
+      ? 'text-[var(--color-primary)] border-b-2 border-[#B85C45] pb-1' 
       : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'
     }
   `;
 
   return (
-    <nav className="sticky top-0 z-50 flex justify-between items-center w-full px-6 md:px-[var(--spacing-gutter)] max-w-[var(--spacing-container-max)] mx-auto h-20 bg-[var(--color-background)]">
+    <nav className="sticky top-0 z-50 flex justify-between items-center w-full px-6 md:px-[var(--spacing-gutter)] max-w-[var(--spacing-container-max)] mx-auto h-20 bg-[#F5F1EA]">
       <div className="flex items-center gap-8">
-        <Link href="/" className="text-headline-md font-headline-md font-bold text-[var(--color-primary)]">
+        <Link href="/" className="text-xl font-bold text-[var(--color-primary)]">
           ZuhraGraph
         </Link>
         <div className="hidden md:flex gap-6 items-center pt-1">
@@ -50,10 +97,52 @@ export function Navbar() {
           <div className="hidden md:flex items-center gap-4 w-[140px] h-9"></div>
         ) : status === 'authenticated' ? (
           <>
-            <button className="text-[var(--color-secondary)] hover:text-[var(--color-primary)] focus:outline-none">
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
-            <div className="relative hidden md:block">
+            <div className="relative hidden md:block" ref={notificationRef}>
+              <button 
+                type="button" 
+                aria-label="Notifications"
+                onClick={() => setNotificationDropdownOpen(!notificationDropdownOpen)}
+                className="relative cursor-pointer p-1 text-[var(--color-secondary)] hover:text-[var(--color-primary)] focus:outline-none"
+              >
+                <span className="material-symbols-outlined">notifications</span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+                )}
+              </button>
+              {notificationDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-white border border-[#DDD7CE] shadow-lg rounded py-2 z-[99] max-h-96 overflow-y-auto">
+                  <div className="px-4 py-2 border-b border-[#DDD7CE] flex justify-between items-center">
+                    <h3 className="font-bold text-[var(--color-primary)] text-sm">Notifikasi</h3>
+                    {unreadCount > 0 && (
+                      <button onClick={markAllAsRead} className="text-xs text-[#B85C45] hover:underline">
+                        Tandai Semua Dibaca
+                      </button>
+                    )}
+                  </div>
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-sm text-[var(--color-secondary)]">
+                      Belum ada notifikasi
+                    </div>
+                  ) : (
+                    <div className="flex flex-col">
+                      {notifications.map((notif) => (
+                        <Link 
+                          key={notif.id}
+                          href={(session.user as any).role === 'ADMIN' ? '/admin/orders' : '/orders'}
+                          onClick={() => setNotificationDropdownOpen(false)}
+                          className={`px-4 py-3 border-b border-[#DDD7CE] last:border-b-0 hover:bg-gray-50 transition-colors block ${notif.status === 'UNREAD' ? 'bg-orange-50' : ''}`}
+                        >
+                          <p className="text-sm text-[var(--color-primary)] leading-tight">{notif.content}</p>
+                          <p className="text-xs text-[var(--color-secondary)] mt-1.5">{new Date(notif.createdAt).toLocaleDateString()}</p>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="relative hidden md:block" ref={profileRef}>
               <button 
                 onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                 className="flex items-center gap-2 text-[var(--color-secondary)] hover:text-[var(--color-primary)] focus:outline-none"
@@ -61,14 +150,14 @@ export function Navbar() {
                 <span className="material-symbols-outlined">account_circle</span>
               </button>
               {profileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white border border-[var(--color-border-line)] shadow-lg rounded py-1 z-50">
-                  <div className="px-4 py-2 border-b border-[var(--color-border-line)] text-sm">
+                <div className="absolute right-0 mt-2 w-48 bg-white border border-[#DDD7CE] shadow-lg rounded py-1 z-[99]">
+                  <div className="px-4 py-2 border-b border-[#DDD7CE] text-sm">
                     <p className="font-bold truncate text-[var(--color-primary)]">{session.user?.name}</p>
                     <p className="text-[var(--color-secondary)] truncate">{session.user?.email}</p>
                   </div>
                   <button 
                     onClick={() => signOut({ callbackUrl: '/' })}
-                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-[var(--color-surface)]"
+                    className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
                   >
                     Keluar
                   </button>
@@ -78,7 +167,7 @@ export function Navbar() {
           </>
         ) : (
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/login" className="text-label-md font-label-md text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors">
+            <Link href="/login" className="text-sm font-semibold text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors">
               Masuk
             </Link>
             <Link href="/packages">
@@ -97,13 +186,13 @@ export function Navbar() {
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="absolute top-20 left-0 w-full bg-[var(--color-background)] border-b border-[var(--color-border-line)] p-4 flex flex-col gap-4 shadow-lg md:hidden z-40">
+        <div className="absolute top-20 left-0 w-full bg-[#F5F1EA] border-b border-[#DDD7CE] p-4 flex flex-col gap-4 shadow-lg md:hidden z-40">
           <Link href="/" onClick={() => setMobileMenuOpen(false)} className={navLinkClass('/')}>Beranda</Link>
           <Link href="/portfolio" onClick={() => setMobileMenuOpen(false)} className={navLinkClass('/portfolio')}>Portofolio</Link>
           <Link href="/packages" onClick={() => setMobileMenuOpen(false)} className={navLinkClass('/packages')}>Komisi</Link>
           <Link href="/faq" onClick={() => setMobileMenuOpen(false)} className={navLinkClass('/faq')}>FAQ</Link>
           {status === 'loading' ? (
-            <div className="flex flex-col gap-4 mt-2 pt-4 border-t border-[var(--color-border-line)]">
+            <div className="flex flex-col gap-4 mt-2 pt-4 border-t border-[#DDD7CE]">
               <div className="w-full h-8"></div>
             </div>
           ) : status === 'authenticated' ? (
@@ -115,14 +204,14 @@ export function Navbar() {
               )}
               <button 
                 onClick={() => { setMobileMenuOpen(false); signOut({ callbackUrl: '/' }); }}
-                className="text-left text-label-md font-label-md text-red-600 hover:text-red-700 mt-2"
+                className="text-left text-sm font-semibold text-red-600 hover:text-red-700 mt-2"
               >
                 Keluar
               </button>
             </>
           ) : (
-            <div className="flex flex-col gap-4 mt-2 pt-4 border-t border-[var(--color-border-line)]">
-              <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="text-label-md font-label-md text-[var(--color-primary)]">
+            <div className="flex flex-col gap-4 mt-2 pt-4 border-t border-[#DDD7CE]">
+              <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-[var(--color-primary)]">
                 Masuk
               </Link>
               <Link href="/packages" onClick={() => setMobileMenuOpen(false)}>

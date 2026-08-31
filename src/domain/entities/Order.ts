@@ -121,4 +121,8 @@ export class Order {
     }
     this.status = 'CANCELLED';
   }
+
+  public adminUpdateStatus(newStatus: OrderStatus): void {
+    this.status = newStatus;
+  }
 }

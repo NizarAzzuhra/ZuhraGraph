@@ -4,28 +4,16 @@ import { authOptions } from '../../../auth/[...nextauth]/route';
 import { RevisionService } from '../../../../../application/services/RevisionService';
 import { PrismaOrderRepository } from '../../../../../infrastructure/repositories/PrismaOrderRepository';
 import { PrismaRevisionRequestRepository } from '../../../../../infrastructure/repositories/PrismaRevisionRequestRepository';
-import { PrismaPaymentRepository } from '../../../../../infrastructure/repositories/PrismaPaymentRepository';
-import { MidtransPaymentGateway } from '../../../../../infrastructure/payment/MidtransPaymentGateway';
 
-// Mock Notification Service since real one is not yet implemented
-class MockNotificationService {
-  async sendNotification(userId: string, type: string, content: string) {
-    console.log(`Notification to ${userId}: [${type}] ${content}`);
-  }
-  async markAsRead(notificationId: string) {}
-}
+import { PrismaNotificationService } from '../../../../../infrastructure/services/PrismaNotificationService';
 
 const orderRepository = new PrismaOrderRepository();
 const revisionRequestRepository = new PrismaRevisionRequestRepository();
-const paymentRepository = new PrismaPaymentRepository();
-const paymentGateway = new MidtransPaymentGateway();
-const notificationService = new MockNotificationService();
+const notificationService = new PrismaNotificationService();
 
 const revisionService = new RevisionService(
   orderRepository,
   revisionRequestRepository,
-  paymentRepository,
-  paymentGateway,
   notificationService
 );
 

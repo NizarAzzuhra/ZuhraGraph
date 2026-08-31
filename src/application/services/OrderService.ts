@@ -1,4 +1,4 @@
-import { Order } from '../../domain/entities/Order';
+import { Order, OrderStatus } from '../../domain/entities/Order';
 import { OrderRepository } from '../../domain/interfaces/OrderRepository';
 import { PaymentGateway } from '../../domain/interfaces/PaymentGateway';
 import { NotificationService } from '../../domain/interfaces/NotificationService';
@@ -58,7 +58,7 @@ export class OrderService {
     let paymentInfo = null;
     let paymentError = false;
     try {
-      paymentInfo = await this.paymentGateway.initiatePayment(payment.id, amount, buyerInfo);
+      paymentInfo = await this.paymentGateway.initiatePayment(payment.id, amount, buyerInfo, order.id);
       
       // 6. Set token and Save Payment again if successful
       payment.setToken(paymentInfo.token);
@@ -71,6 +71,9 @@ export class OrderService {
 
     // 7. Send notification
     await this.notificationService.sendNotification(buyerId, 'ORDER_CREATED', `Order ${order.id} created. Please complete payment.`);
+    if (this.notificationService.sendToAdmins) {
+      await this.notificationService.sendToAdmins('ORDER_CREATED', `Pesanan baru masuk dari ${buyerInfo?.name || 'Buyer'}`, `/admin/orders/${order.id}`);
+    }
 
     return { order, paymentInfo, paymentError };
   }
@@ -135,6 +138,9 @@ export class OrderService {
     await this.orderRepository.save(order);
     
     await this.notificationService.sendNotification(order.buyerId, 'ORDER_COMPLETED', `Order ${order.id} has been completed.`);
+    if (this.notificationService.sendToAdmins) {
+      await this.notificationService.sendToAdmins('ORDER_COMPLETED', `Pesanan #${order.id} telah diterima dan diselesaikan oleh buyer`, `/admin/orders/${order.id}`);
+    }
     
     return order;
   }
@@ -151,13 +157,13 @@ export class OrderService {
     return order;
   }
 
-  public async getOrderDetails(orderId: string, buyerId: string) {
+  public async getOrderDetails(orderId: string, buyerId: string, userRole?: string) {
     const order = await this.orderRepository.findById(orderId);
     if (!order) {
       throw new Error('Order not found');
     }
     
-    if (order.buyerId !== buyerId) {
+    if (order.buyerId !== buyerId && userRole !== 'ADMIN') {
       throw new Error('Unauthorized access to order');
     }
 
@@ -178,5 +184,37 @@ export class OrderService {
 
   public async getAllOrders() {
     return this.orderRepository.findAllList();
+  }
+
+  public async getAllOrdersForAdmin() {
+    return this.orderRepository.findAllForAdmin();
+  }
+
+  public async updateOrderStatus(orderId: string, status: OrderStatus) {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) {
+      throw new Error('Order not found');
+    }
+    
+    order.adminUpdateStatus(status);
+    await this.orderRepository.save(order);
+    
+    return order;
+  }
+
+  public async submitArtwork(orderId: string, url: string) {
+    const order = await this.orderRepository.findById(orderId);
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    order.uploadArtwork(); // Validates state transition
+
+    const count = await this.orderRepository.getArtworkCount(orderId);
+    await this.orderRepository.addArtwork(orderId, url, count);
+
+    await this.notificationService.sendNotification(order.buyerId, 'ARTWORK_UPLOADED', `Artwork for order ${order.id} has been uploaded.`);
+    
+    return order;
   }
 }

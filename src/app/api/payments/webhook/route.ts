@@ -7,9 +7,19 @@ import { OrderService } from '../../../../application/services/OrderService';
 import { PaymentService } from '../../../../application/services/PaymentService';
 
 // Mock Notification Service since real one is not yet implemented
-class MockNotificationService {
+class RealNotificationService {
   async sendNotification(userId: string, type: string, content: string) {
-    console.log(`Notification to ${userId}: [${type}] ${content}`);
+    try {
+      const { prisma } = await import('../../../../lib/prisma');
+      await prisma.notification.create({
+        data: {
+          userId,
+          type: (['ORDER_CREATED', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'ORDER_CONFIRMED', 'ARTWORK_UPLOADED', 'REVISION_REQUESTED', 'ORDER_COMPLETED', 'REVIEW_SUBMITTED', 'SYSTEM'].includes(type) ? type : 'SYSTEM') as any,
+          content,
+          status: 'UNREAD',
+        }
+      });
+    } catch(e) { console.error("Notif Error:", e) }
   }
   async markAsRead(notificationId: string) {}
 }
@@ -18,7 +28,7 @@ const paymentGateway = new MidtransPaymentGateway();
 const orderRepository = new PrismaOrderRepository();
 const paymentRepository = new PrismaPaymentRepository();
 const packageRepository = new PrismaPackageRepository();
-const notificationService = new MockNotificationService();
+const notificationService = new RealNotificationService();
 
 const orderService = new OrderService(
   orderRepository,
@@ -30,7 +40,8 @@ const orderService = new OrderService(
 
 const paymentService = new PaymentService(
   paymentRepository,
-  paymentGateway
+  paymentGateway,
+  orderRepository
 );
 
 export async function POST(req: Request) {
@@ -127,12 +138,65 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, message: 'Missing transaction_id' }, { status: 400 });
       }
       
-      if (currentPaymentStatus !== 'SUCCESS') {
-        await paymentService.markPaymentAsSuccessful(payment.id, transaction_id);
-      }
+      const isPaymentUpdateNeeded = currentPaymentStatus !== 'SUCCESS';
+      const isOrderUpdateNeeded = order.getStatus() === 'AWAITING_PAYMENT';
       
-      if (order.getStatus() === 'AWAITING_PAYMENT') {
-        await orderService.handlePaymentSuccess(order.id, transaction_id);
+      const { prisma } = await import('../../../../lib/prisma');
+
+      // Check if this payment is for a RevisionRequest
+      const revisionRequest = await prisma.revisionRequest.findFirst({
+        where: {
+          orderId: order.id,
+          status: 'REQUIRES_PAYMENT',
+          buyerDecision: 'ACCEPTED',
+          extraFee: payment.amount,
+        }
+      });
+      const isRevisionUpdateNeeded = !!revisionRequest;
+      
+      if (isPaymentUpdateNeeded || isOrderUpdateNeeded || isRevisionUpdateNeeded) {
+        if (isPaymentUpdateNeeded) payment.markAsSuccess(transaction_id);
+        if (isOrderUpdateNeeded) order.markAsPaid();
+        
+        await prisma.$transaction(async (tx) => {
+          if (isPaymentUpdateNeeded) {
+            await tx.payment.upsert({
+              where: { id: payment.id },
+              update: { status: payment.getStatus(), transactionId: payment.getTransactionId(), token: payment.getToken() },
+              create: { id: payment.id, orderId: payment.orderId, amount: payment.amount, status: payment.getStatus(), transactionId: payment.getTransactionId(), token: payment.getToken() }
+            });
+          }
+          if (isOrderUpdateNeeded) {
+            await tx.order.upsert({
+              where: { id: order.id },
+              update: { status: order.getStatus(), totalAmount: order.totalAmount, brief: order.brief },
+              create: { id: order.id, buyerId: order.buyerId, packageId: order.packageId, totalAmount: order.totalAmount, brief: order.brief, status: order.getStatus(), createdAt: order.createdAt }
+            });
+          }
+          if (isRevisionUpdateNeeded && revisionRequest) {
+            await tx.revisionRequest.update({
+              where: { id: revisionRequest.id },
+              data: { status: 'APPROVED_PAID' }
+            });
+          }
+        });
+        
+        if (isOrderUpdateNeeded) {
+          await notificationService.sendNotification(order.buyerId, 'PAYMENT_SUCCESS', `Payment for order ${order.id} was successful.`);
+        }
+
+        if (isRevisionUpdateNeeded) {
+          await notificationService.sendNotification(order.buyerId, 'SYSTEM', `Pembayaran untuk revisi pesanan ${order.id} berhasil.`);
+          // Notify admins
+          try {
+            const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
+            for (const admin of admins) {
+              await notificationService.sendNotification(admin.id, 'SYSTEM', `Pembeli telah membayar revisi untuk pesanan ${order.id}. Siap dikerjakan.`);
+            }
+          } catch(e) {
+            console.error("Failed to notify admins", e);
+          }
+        }
       }
       
     } else if (mappedStatus === 'FAILED') {

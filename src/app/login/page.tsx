@@ -2,12 +2,26 @@
 
 import { useState, FormEvent } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#FCFAF7] flex items-center justify-center">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl');
+  // Cegah open redirect dengan memastikan callback dimulai dengan '/'
+  const redirectUrl = callbackUrl && callbackUrl.startsWith('/') ? callbackUrl : '/';
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -30,7 +44,7 @@ export default function LoginPage() {
       setErrorMessage('Email atau kata sandi tidak valid. Silakan coba lagi.');
     } else if (res?.ok) {
       setStatus('success');
-      router.push('/');
+      router.push(redirectUrl);
       router.refresh();
     } else {
       setStatus('idle');

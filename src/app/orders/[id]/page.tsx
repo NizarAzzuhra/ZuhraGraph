@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Script from "next/script";
 import Link from "next/link";
+// ReferenceUploader is only needed if used for other things, but brief edit is gone.
+// We remove the import if it's unused. We are keeping ReferenceImage type in case it's needed elsewhere? No, remove.
 
 export default function OrderDetailPage() {
   const { data: session, status } = useSession();
@@ -17,15 +19,13 @@ export default function OrderDetailPage() {
   const [error, setError] = useState("");
   const [paying, setPaying] = useState(false);
 
-  // States for client actions
-  const [briefText, setBriefText] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   
   // Revision states
   const [revisionDesc, setRevisionDesc] = useState("");
   
-  // Admin decision states
+  // Admin decision states for Revisions
   const [decisionReason, setDecisionReason] = useState("");
   const [extraFee, setExtraFee] = useState(0);
   const [revisionClass, setRevisionClass] = useState<"CORRECTION" | "REVISION" | "SCOPE_CHANGE">("REVISION");
@@ -34,42 +34,65 @@ export default function OrderDetailPage() {
   const [artworkUrl, setArtworkUrl] = useState("");
   const [uploadingArtwork, setUploadingArtwork] = useState(false);
 
+  // Admin Override Status states
+  const [selectedAdminStatus, setSelectedAdminStatus] = useState<string>("");
+  const [adminStatusLoading, setAdminStatusLoading] = useState(false);
+
   const orderId = params.id as string;
   const userRole = (session?.user as any)?.role || "BUYER";
 
-  const fetchOrderDetails = async () => {
+  const fetchOrderDetails = async (isPolling = false): Promise<string | null> => {
     try {
-      setLoading(true);
-      const res = await fetch(`/api/orders/${orderId}`);
+      if (!isPolling) setLoading(true);
+      const res = await fetch(`/api/orders/${orderId}?t=${Date.now()}`);
       if (res.status === 401 || res.status === 403) {
         setError("Anda tidak memiliki akses ke pesanan ini.");
-        return;
+        return null;
       }
       if (res.status === 404) {
         setError("Pesanan tidak ditemukan.");
-        return;
+        return null;
       }
       
       const data = await res.json();
       if (data.success) {
         setOrderData(data.data);
         setPaymentData(data.payment);
-        setBriefText(data.data.order.brief);
+        return data.data.order.status;
       } else {
-        setError(data.message || "Gagal memuat detail pesanan.");
+        if (!isPolling) setError(data.message || "Gagal memuat detail pesanan.");
+        return null;
       }
     } catch (err: any) {
-      setError(err.message || "Terjadi kesalahan yang tidak terduga.");
+      if (!isPolling) setError(err.message || "Terjadi kesalahan yang tidak terduga.");
+      return null;
     } finally {
-      setLoading(false);
+      if (!isPolling) setLoading(false);
     }
+  };
+
+  const pollOrderDetails = async () => {
+    setLoading(true);
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    const checkStatus = async () => {
+      attempts++;
+      const status = await fetchOrderDetails(true);
+      
+      if (status === 'PAID' || attempts >= maxAttempts) {
+        setLoading(false);
+      } else {
+        setTimeout(checkStatus, 2000);
+      }
+    };
+    
+    checkStatus();
   };
 
   useEffect(() => {
     if (status === "authenticated") {
       fetchOrderDetails();
-    } else if (status === "unauthenticated") {
-      router.push(`/login?callbackUrl=/orders/${orderId}`);
     }
   }, [status, orderId]);
 
@@ -85,7 +108,7 @@ export default function OrderDetailPage() {
         if (typeof window.snap !== 'undefined') {
           window.snap.pay(data.data.token, {
             onSuccess: function() {
-              fetchOrderDetails();
+              pollOrderDetails();
             },
             onPending: function() {
               fetchOrderDetails();
@@ -108,62 +131,6 @@ export default function OrderDetailPage() {
       alert(err.message || "Terjadi kesalahan.");
     } finally {
       setPaying(false);
-    }
-  };
-
-  const handleDirectBriefUpdate = async () => {
-    if (!briefText.trim()) {
-      setActionError("Brief tidak boleh kosong.");
-      return;
-    }
-    if (briefText.length > 1000) {
-      setActionError("Brief tidak boleh lebih dari 1000 karakter.");
-      return;
-    }
-
-    setActionLoading(true);
-    setActionError("");
-    try {
-      const res = await fetch(`/api/orders/${orderId}/brief-edit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ proposedBrief: briefText })
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(data.message);
-        fetchOrderDetails();
-      } else {
-        setActionError(data.message || "Gagal memperbarui brief.");
-      }
-    } catch (err: any) {
-      setActionError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDecideBriefEdit = async (requestId: string, approve: boolean) => {
-    setActionLoading(true);
-    setActionError("");
-    try {
-      const res = await fetch(`/api/orders/${orderId}/brief-edit/${requestId}/decide`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approve, reason: decisionReason })
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert(data.message);
-        setDecisionReason("");
-        fetchOrderDetails();
-      } else {
-        setActionError(data.message || "Gagal memproses keputusan.");
-      }
-    } catch (err: any) {
-      setActionError(err.message || "Terjadi kesalahan.");
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -205,28 +172,39 @@ export default function OrderDetailPage() {
     }
   };
 
-  const handleDecideRevision = async (requestId: string, approve: boolean) => {
+  const handleRespondToPaidRevision = async (requestId: string, accept: boolean) => {
     setActionLoading(true);
     setActionError("");
     try {
-      const res = await fetch(`/api/orders/${orderId}/revision-request/${requestId}/decide`, {
+      const res = await fetch(`/api/orders/${orderId}/revision-response`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          approve,
-          classification: revisionClass,
-          extraFee: Number(extraFee),
-          reason: decisionReason
-        })
+        body: JSON.stringify({ requestId, accept })
       });
       const data = await res.json();
       if (data.success) {
-        alert(data.message);
-        setDecisionReason("");
-        setExtraFee(0);
-        fetchOrderDetails();
+        if (data.data?.paymentToken && typeof window.snap !== 'undefined') {
+          window.snap.pay(data.data.paymentToken, {
+            onSuccess: function() {
+              pollOrderDetails();
+            },
+            onPending: function() {
+              fetchOrderDetails();
+            },
+            onError: function() {
+              alert("Pembayaran gagal! Silakan coba lagi.");
+              fetchOrderDetails();
+            },
+            onClose: function() {
+              fetchOrderDetails();
+            }
+          });
+        } else {
+          alert(data.message);
+          fetchOrderDetails();
+        }
       } else {
-        setActionError(data.message || "Gagal memproses keputusan revisi.");
+        setActionError(data.message || "Gagal memproses persetujuan revisi berbayar.");
       }
     } catch (err: any) {
       setActionError(err.message || "Terjadi kesalahan.");
@@ -234,21 +212,7 @@ export default function OrderDetailPage() {
       setActionLoading(false);
     }
   };
-
-  const handleStartRevision = async () => {
-    setActionLoading(true);
-    setActionError("");
-    try {
-      const res = await fetch(`/api/orders/${orderId}/revision-request`, {
-        method: "PUT"
-      });
-      // We can also support calling PUT to execute startRevision. Let's make sure it handles startRevision
-      // Wait, let's create a PUT route or use a POST route to trigger startRevision.
-      // Let's check: did we create PUT route? We can implement it in the revision-request route.
-      // Wait, let's just make a POST to /api/orders/[id]/revision-request with action or call PUT.
-      // Let's implement PUT in revision-request route to startRevision! It is very easy and clean.
-    } catch (err: any) {}
-  };
+  // Admin tools moved to AdminRevisionActions.tsx
 
   const handleUploadArtworkFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -289,7 +253,7 @@ export default function OrderDetailPage() {
 
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/orders/${orderId}/artwork`, {
+      const res = await fetch(`/api/admin/orders/${orderId}/artwork`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: artworkUrl })
@@ -306,6 +270,30 @@ export default function OrderDetailPage() {
       alert("Terjadi kesalahan.");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleAdminUpdateStatus = async () => {
+    const statusToUpdate = selectedAdminStatus || orderData?.order?.status;
+    if (!statusToUpdate) return;
+    setAdminStatusLoading(true);
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: statusToUpdate })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Status updated successfully.");
+        fetchOrderDetails();
+      } else {
+        alert(data.message || "Failed to update status.");
+      }
+    } catch (err) {
+      alert("Error updating status.");
+    } finally {
+      setAdminStatusLoading(false);
     }
   };
 
@@ -332,7 +320,7 @@ export default function OrderDetailPage() {
     return null;
   }
 
-  const { order, package: pkg, briefEditRequests, revisionRequests, artworkVersions } = orderData;
+  const { order, package: pkg, revisionRequests, artworkVersions } = orderData;
   const isPendingPayment = paymentData?.status === "PENDING";
 
   let parsedBrief: any = null;
@@ -382,10 +370,6 @@ export default function OrderDetailPage() {
       </div>
     );
   };
-
-  const canEditBriefDirectly = order.status === "PENDING" || order.status === "AWAITING_PAYMENT";
-  const canRequestBriefEdit = !["COMPLETED", "CANCELLED", "PENDING", "AWAITING_PAYMENT"].includes(order.status);
-  const hasPendingBriefRequest = briefEditRequests?.some((r: any) => r.status === "PENDING");
 
   const latestArtwork = artworkVersions?.[0];
 
@@ -450,7 +434,7 @@ export default function OrderDetailPage() {
                     <div>
                       <h3 className="font-semibold text-lg text-[#2D2D2D] mb-3">Hasil Desain (Artwork)</h3>
                       <div className="grid grid-cols-1 gap-4">
-                        {artworkVersions.map((art: any, index: number) => (
+                        {artworkVersions.map((art: any) => (
                           <div key={art.id} className="bg-[#FDFBF7] p-4 rounded-xl border border-[#2D2D2D]/10 flex flex-col gap-3">
                             <div className="flex justify-between items-center text-xs">
                               <span className="font-semibold text-[#2D2D2D]">Versi {art.revisionNumber}</span>
@@ -464,106 +448,6 @@ export default function OrderDetailPage() {
                                 <span className="material-symbols-outlined text-[16px]">download</span> Unduh Desain
                               </a>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Brief Editing Actions */}
-                  {(canEditBriefDirectly || canRequestBriefEdit) && (
-                    <div className="pt-6 border-t border-[#2D2D2D]/10">
-                      <h3 className="font-semibold text-[#2D2D2D] mb-2">Perbarui Brief Pesanan</h3>
-                      <p className="text-xs text-[#2D2D2D]/60 mb-3">
-                        {canEditBriefDirectly 
-                          ? "Anda masih dapat mengedit brief secara langsung karena pesanan belum dibayar." 
-                          : "Pesanan telah berjalan. Anda harus mengajukan permohonan perubahan brief untuk disetujui artist."}
-                      </p>
-                      <textarea
-                        rows={4}
-                        value={briefText}
-                        onChange={(e) => setBriefText(e.target.value)}
-                        className="w-full p-4 rounded-xl border border-[#2D2D2D]/20 focus:outline-none focus:border-[#E07A5F] text-sm bg-[#FDFBF7] resize-y"
-                        placeholder="Tulis brief baru di sini..."
-                        disabled={actionLoading || hasPendingBriefRequest}
-                      />
-                      {actionError && <p className="text-red-500 text-xs mt-1">{actionError}</p>}
-                      <div className="mt-3 flex justify-between items-center">
-                        <span className="text-xs text-[#2D2D2D]/50">{briefText.length}/1000</span>
-                        {canEditBriefDirectly ? (
-                          <button
-                            onClick={handleDirectBriefUpdate}
-                            disabled={actionLoading}
-                            className="px-6 py-2 rounded-full bg-[#2D2D2D] text-white hover:bg-[#E07A5F] text-xs font-semibold transition-colors disabled:opacity-50"
-                          >
-                            {actionLoading ? "Menyimpan..." : "Simpan Perubahan Brief"}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={handleDirectBriefUpdate}
-                            disabled={actionLoading || hasPendingBriefRequest}
-                            className="px-6 py-2 rounded-full bg-[#E07A5F] text-white hover:bg-[#D06950] text-xs font-semibold transition-colors disabled:opacity-50"
-                          >
-                            {hasPendingBriefRequest ? "Menunggu Persetujuan..." : "Ajukan Perubahan Brief"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Brief Edit Requests History */}
-                  {briefEditRequests && briefEditRequests.length > 0 && (
-                    <div className="pt-6 border-t border-[#2D2D2D]/10">
-                      <h3 className="font-semibold text-sm text-[#2D2D2D] mb-3">Riwayat Permintaan Perubahan Brief</h3>
-                      <div className="space-y-3">
-                        {briefEditRequests.map((r: any) => (
-                          <div key={r.id} className="p-4 rounded-xl border border-[#2D2D2D]/10 text-xs bg-white space-y-2">
-                            <div className="flex justify-between items-center">
-                              <span className={`px-2 py-0.5 rounded-full font-medium ${
-                                r.status === 'APPROVED' ? 'bg-green-100 text-green-800' :
-                                r.status === 'REJECTED' ? 'bg-red-100 text-red-800' :
-                                'bg-yellow-100 text-yellow-800'
-                              }`}>
-                                {r.status === 'APPROVED' ? 'Disetujui' : r.status === 'REJECTED' ? 'Ditolak' : 'Menunggu'}
-                              </span>
-                              <span className="text-[#2D2D2D]/50">{new Date(r.createdAt).toLocaleString('id-ID')}</span>
-                            </div>
-                            <p className="font-semibold">Brief yang Diajukan:</p>
-                            <p className="bg-[#FDFBF7] p-2 rounded border border-[#2D2D2D]/5 font-mono">{r.proposedBrief}</p>
-                            {r.reason && (
-                              <p className="text-[#2D2D2D]/80">
-                                <span className="font-semibold">Catatan Artist:</span> {r.reason}
-                              </p>
-                            )}
-                            {/* Admin Actions */}
-                            {userRole === 'ADMIN' && r.status === 'PENDING' && (
-                              <div className="mt-3 pt-3 border-t border-[#2D2D2D]/5 flex flex-col gap-2">
-                                <p className="font-semibold text-xs text-[#2D2D2D]">Tindakan Admin:</p>
-                                <input
-                                  type="text"
-                                  placeholder="Berikan alasan (wajib jika menolak)..."
-                                  value={decisionReason}
-                                  onChange={(e) => setDecisionReason(e.target.value)}
-                                  className="w-full p-2 border border-[#2D2D2D]/10 rounded-lg text-xs focus:outline-none focus:border-[#E07A5F] bg-[#FDFBF7]"
-                                />
-                                <div className="flex gap-2 justify-end">
-                                  <button
-                                    onClick={() => handleDecideBriefEdit(r.id, false)}
-                                    disabled={actionLoading}
-                                    className="px-4 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
-                                  >
-                                    Tolak
-                                  </button>
-                                  <button
-                                    onClick={() => handleDecideBriefEdit(r.id, true)}
-                                    disabled={actionLoading}
-                                    className="px-4 py-1.5 rounded-full bg-green-600 hover:bg-green-700 text-white text-xs font-semibold"
-                                  >
-                                    Setujui
-                                  </button>
-                                </div>
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
@@ -622,8 +506,8 @@ export default function OrderDetailPage() {
                               <div className="mt-2 text-xs grid grid-cols-2 gap-2 max-w-sm">
                                 <span className="text-[#2D2D2D]/60">Klasifikasi:</span>
                                 <span className="font-semibold text-[#2D2D2D]">
-                                  {rev.classification === 'CORRECTION' ? 'Koreksi Artist' :
-                                   rev.classification === 'REVISION' ? 'Revisi Minor' : 'Scope Change (Revisi Besar)'}
+                                  {rev.classification === 'ARTIST_ERROR' ? 'Koreksi Artist (Gratis)' :
+                                   rev.classification === 'MINOR_REVISION' ? 'Revisi Minor' : 'Scope Change (Revisi Besar)'}
                                 </span>
                                 <span className="text-[#2D2D2D]/60">Biaya Tambahan:</span>
                                 <span className="font-semibold text-primary">
@@ -638,57 +522,63 @@ export default function OrderDetailPage() {
                               </p>
                             )}
 
-                            {/* Admin Actions */}
-                            {userRole === 'ADMIN' && rev.status === 'PENDING' && (
-                              <div className="mt-3 pt-3 border-t border-[#2D2D2D]/5 flex flex-col gap-3">
-                                <p className="font-semibold text-xs text-[#2D2D2D]">Persetujuan & Klasifikasi Revisi (Admin Only):</p>
-                                <div className="grid grid-cols-2 gap-4">
+                            {/* Buyer Actions for REQUIRES_PAYMENT */}
+                            {userRole === 'BUYER' && rev.status === 'REQUIRES_PAYMENT' && (
+                              <div className="mt-4 p-4 border border-yellow-300 bg-yellow-50 rounded-xl flex flex-col gap-3">
+                                <div className="flex items-start gap-2">
+                                  <span className="material-symbols-outlined text-yellow-600">warning</span>
                                   <div>
-                                    <label className="block text-[10px] text-[#2D2D2D]/60 uppercase mb-1">Klasifikasi</label>
-                                    <select
-                                      value={revisionClass}
-                                      onChange={(e: any) => setRevisionClass(e.target.value)}
-                                      className="w-full p-2 border border-[#2D2D2D]/10 rounded-lg text-xs bg-[#FDFBF7]"
-                                    >
-                                      <option value="CORRECTION">Koreksi Artist (Free)</option>
-                                      <option value="REVISION">Revisi Minor ( allowance )</option>
-                                      <option value="SCOPE_CHANGE">Scope Change (Berbayar)</option>
-                                    </select>
-                                  </div>
-                                  <div>
-                                    <label className="block text-[10px] text-[#2D2D2D]/60 uppercase mb-1">Biaya Tambahan (Rp)</label>
-                                    <input
-                                      type="number"
-                                      value={extraFee}
-                                      onChange={(e) => setExtraFee(Number(e.target.value))}
-                                      className="w-full p-2 border border-[#2D2D2D]/10 rounded-lg text-xs bg-[#FDFBF7]"
-                                    />
+                                    <p className="font-bold text-yellow-900 text-sm">Persetujuan Revisi Berbayar</p>
+                                    <p className="text-yellow-800 text-xs mt-1 leading-relaxed">
+                                      Permintaan revisi ini diklasifikasikan sebagai <strong>{rev.classification}</strong> dan membutuhkan biaya tambahan sebesar <strong>Rp {Number(rev.extraFee).toLocaleString('id-ID')}</strong>. Jika disetujui, biaya tambahan ini akan ditambahkan ke total transaksi Anda.
+                                    </p>
                                   </div>
                                 </div>
-                                <input
-                                  type="text"
-                                  placeholder="Berikan catatan tambahan / alasan..."
-                                  value={decisionReason}
-                                  onChange={(e) => setDecisionReason(e.target.value)}
-                                  className="w-full p-2 border border-[#2D2D2D]/10 rounded-lg text-xs focus:outline-none focus:border-[#E07A5F] bg-[#FDFBF7]"
-                                />
-                                <div className="flex gap-2 justify-end">
+                                <div className="flex gap-2 justify-end mt-2">
                                   <button
-                                    onClick={() => handleDecideRevision(rev.id, false)}
+                                    onClick={() => handleRespondToPaidRevision(rev.id, false)}
                                     disabled={actionLoading}
-                                    className="px-4 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+                                    className="px-4 py-2 rounded-full bg-white border border-red-200 hover:bg-red-50 text-red-600 text-xs font-bold transition-colors"
                                   >
-                                    Tolak
+                                    Tolak (Batalkan Revisi)
                                   </button>
                                   <button
-                                    onClick={() => handleDecideRevision(rev.id, true)}
+                                    onClick={() => handleRespondToPaidRevision(rev.id, true)}
                                     disabled={actionLoading}
-                                    className="px-4 py-1.5 rounded-full bg-green-600 hover:bg-green-700 text-white text-xs font-semibold"
+                                    className="px-4 py-2 rounded-full bg-[#E07A5F] hover:bg-surface-tint text-white text-xs font-bold transition-colors shadow-sm"
                                   >
-                                    Setujui
+                                    Setujui & Lanjutkan
                                   </button>
                                 </div>
                               </div>
+                            )}
+
+                            {rev.buyerDecision === 'ACCEPTED' && rev.status === 'REQUIRES_PAYMENT' && (
+                              <div className="mt-4 p-4 border border-blue-200 bg-blue-50 rounded-xl flex flex-col gap-3">
+                                <p className="text-blue-900 text-xs font-semibold">
+                                  Anda telah menyetujui biaya revisi. Silakan selesaikan pembayaran agar pesanan dapat dikerjakan.
+                                </p>
+                                <div className="flex justify-end">
+                                  <button
+                                    onClick={() => handleRespondToPaidRevision(rev.id, true)}
+                                    disabled={actionLoading}
+                                    className="px-4 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors"
+                                  >
+                                    Lanjutkan Pembayaran Revisi
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {rev.buyerDecision === 'ACCEPTED' && rev.status !== 'REQUIRES_PAYMENT' && (
+                              <p className="text-green-700 text-xs mt-2 font-semibold">
+                                ✓ Pembayaran biaya revisi selesai.
+                              </p>
+                            )}
+                            {rev.buyerDecision === 'DECLINED' && (
+                              <p className="text-red-700 text-xs mt-2 font-semibold">
+                                ✗ Pembeli telah menolak biaya revisi.
+                              </p>
                             )}
                           </div>
                         ))}
@@ -774,17 +664,17 @@ export default function OrderDetailPage() {
                   </div>
                   
                   {/* Additional Revision/Scope change fees if applicable */}
-                  {paymentData && paymentData.amount.toNumber() !== Number(pkg.price) && (
+                  {paymentData && Number(paymentData.amount) !== Number(pkg.price) && (
                     <div className="flex justify-between text-[#2D2D2D]/70">
                       <span>Biaya Tambahan (Revisi)</span>
-                      <span>Rp {paymentData.amount.toNumber().toLocaleString('id-ID')}</span>
+                      <span>Rp {Number(paymentData.amount).toLocaleString('id-ID')}</span>
                     </div>
                   )}
 
                   <div className="border-t border-[#2D2D2D]/10 pt-2 flex justify-between font-bold text-[#2D2D2D]">
                     <span>Total Pembayaran</span>
                     <span className="text-primary">
-                      Rp {(paymentData ? paymentData.amount.toNumber() : Number(order.totalAmount)).toLocaleString('id-ID')}
+                      Rp {(paymentData ? Number(paymentData.amount) : Number(order.totalAmount)).toLocaleString('id-ID')}
                     </span>
                   </div>
                 </div>
@@ -858,11 +748,36 @@ export default function OrderDetailPage() {
                   </div>
                 </div>
               )}
+
+              {/* Admin Status Override UI */}
+              {userRole === 'ADMIN' && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-[#2D2D2D]/10 space-y-4">
+                  <h3 className="font-semibold text-xs text-[#2D2D2D]/50 uppercase tracking-widest">Override Status (Admin)</h3>
+                  <div className="flex flex-col gap-2">
+                    <select
+                      value={selectedAdminStatus || order.status}
+                      onChange={(e) => setSelectedAdminStatus(e.target.value)}
+                      className="w-full p-2 border border-[#2D2D2D]/10 rounded-lg text-xs bg-[#FDFBF7]"
+                    >
+                      {Object.entries(statusTranslation).map(([key, label]) => (
+                        <option key={key} value={key}>{label} ({key})</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleAdminUpdateStatus}
+                      disabled={adminStatusLoading}
+                      className="w-full py-2 bg-[#2D2D2D] hover:bg-[#E07A5F] text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 mt-2"
+                    >
+                      {adminStatusLoading ? "Mengupdate..." : "Update Status"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
           <div className="text-center mt-8">
-             <button onClick={fetchOrderDetails} className="text-xs text-[#2D2D2D]/60 hover:text-[#2D2D2D] underline">
+             <button onClick={() => fetchOrderDetails()} className="text-xs text-[#2D2D2D]/60 hover:text-[#2D2D2D] underline">
                Perbarui Halaman
              </button>
           </div>

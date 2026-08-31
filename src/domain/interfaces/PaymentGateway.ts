@@ -4,7 +4,7 @@ export interface PaymentInitiationResult {
 }
 
 export interface PaymentGateway {
-  initiatePayment(orderId: string, amount: number, buyerInfo: any): Promise<PaymentInitiationResult>;
+  initiatePayment(orderId: string, amount: number, buyerInfo: any, zuhraGraphOrderId: string): Promise<PaymentInitiationResult>;
   verifyWebhookSignature(payload: any, signature: string): boolean;
-  getPaymentStatus(transactionId: string): Promise<string>;
+  getPaymentStatus(transactionId: string): Promise<{ transaction_status: string, transaction_id: string }>;
 }

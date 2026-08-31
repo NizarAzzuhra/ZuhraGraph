@@ -4,28 +4,35 @@ import { authOptions } from '../../../../../auth/[...nextauth]/route';
 import { RevisionService } from '../../../../../../../application/services/RevisionService';
 import { PrismaOrderRepository } from '../../../../../../../infrastructure/repositories/PrismaOrderRepository';
 import { PrismaRevisionRequestRepository } from '../../../../../../../infrastructure/repositories/PrismaRevisionRequestRepository';
-import { PrismaPaymentRepository } from '../../../../../../../infrastructure/repositories/PrismaPaymentRepository';
-import { MidtransPaymentGateway } from '../../../../../../../infrastructure/payment/MidtransPaymentGateway';
+import { prisma } from '@/lib/prisma';
 
-// Mock Notification Service since real one is not yet implemented
-class MockNotificationService {
+class RealNotificationService {
   async sendNotification(userId: string, type: string, content: string) {
-    console.log(`Notification to ${userId}: [${type}] ${content}`);
+    try {
+      await prisma.notification.create({
+        data: {
+          userId,
+          type: (['ORDER_CREATED', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'ORDER_CONFIRMED', 'ARTWORK_UPLOADED', 'REVISION_REQUESTED', 'ORDER_COMPLETED', 'REVIEW_SUBMITTED', 'SYSTEM'].includes(type) ? type : 'SYSTEM') as any,
+          content,
+          status: 'UNREAD',
+        }
+      });
+    } catch(e) { console.error("Notif Error:", e) }
   }
-  async markAsRead(notificationId: string) {}
+  async markAsRead(notificationId: string) {
+    try {
+      await prisma.notification.update({ where: { id: notificationId }, data: { status: 'READ' } });
+    } catch(e) { console.error("Notif Error:", e) }
+  }
 }
 
 const orderRepository = new PrismaOrderRepository();
 const revisionRequestRepository = new PrismaRevisionRequestRepository();
-const paymentRepository = new PrismaPaymentRepository();
-const paymentGateway = new MidtransPaymentGateway();
-const notificationService = new MockNotificationService();
+const notificationService = new RealNotificationService();
 
 const revisionService = new RevisionService(
   orderRepository,
   revisionRequestRepository,
-  paymentRepository,
-  paymentGateway,
   notificationService
 );
 
@@ -49,7 +56,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     if (approve) {
-      if (!classification || !['CORRECTION', 'REVISION', 'SCOPE_CHANGE'].includes(classification)) {
+      if (!classification || !['ARTIST_ERROR', 'MINOR_REVISION', 'SCOPE_CHANGE'].includes(classification)) {
         return NextResponse.json({ success: false, message: 'Klasifikasi revisi tidak valid.' }, { status: 400 });
       }
 
@@ -67,8 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({
       success: true,
       message: approve ? 'Permintaan revisi berhasil disetujui.' : 'Permintaan revisi telah ditolak.',
-      data: result.request,
-      paymentInfo: result.paymentInfo
+      data: result.request
     }, { status: 200 });
 
   } catch (error: any) {

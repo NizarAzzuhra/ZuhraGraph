@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import OrderStatusUpdater from '@/components/admin/OrderStatusUpdater';
 
 interface OrderSummary {
   id: string;
@@ -15,6 +16,7 @@ interface OrderSummary {
   status: string;
   paymentStatus: string | null;
   createdAt: string;
+  revisionRequests?: any[];
 }
 
 const mapStatusToIndonesian = (status: string) => {
@@ -118,8 +120,8 @@ export default function AdminOrdersPage() {
     <div className="max-w-[var(--spacing-container-max)] mx-auto px-6 md:px-[var(--spacing-gutter)] py-12">
       <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[var(--color-border-line)] pb-6">
         <div>
-          <h1 className="text-3xl font-headline-lg font-bold text-[var(--color-primary)] mb-2">Dasbor Pesanan</h1>
-          <p className="text-[var(--color-secondary)] font-body-md">Kelola semua pesanan masuk dan status komisi.</p>
+          <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">Dasbor Pesanan</h1>
+          <p className="text-[var(--color-secondary)]">Kelola semua pesanan masuk dan status komisi.</p>
         </div>
         
         {/* Simple Filter */}
@@ -156,7 +158,7 @@ export default function AdminOrdersPage() {
           <p className="mb-4">{error}</p>
           <button 
             onClick={fetchOrders}
-            className="bg-white border border-red-200 text-red-800 px-4 py-2 rounded font-label-md hover:bg-red-100 transition-colors"
+            className="bg-white border border-red-200 text-red-800 px-4 py-2 rounded text-sm font-medium hover:bg-red-100 transition-colors"
           >
             Coba Lagi
           </button>
@@ -164,7 +166,7 @@ export default function AdminOrdersPage() {
       ) : filteredOrders.length === 0 ? (
         <div className="text-center py-20 border border-[var(--color-border-line)] rounded bg-[var(--color-surface)]">
           <span className="material-symbols-outlined text-4xl text-[var(--color-secondary)] mb-4">inventory_2</span>
-          <h2 className="text-xl font-headline-md font-semibold text-[var(--color-primary)] mb-2">Tidak Ada Data</h2>
+          <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-2">Tidak Ada Data</h2>
           <p className="text-[var(--color-secondary)]">Belum ada pesanan yang sesuai dengan kriteria.</p>
         </div>
       ) : (
@@ -202,9 +204,27 @@ export default function AdminOrdersPage() {
                     </div>
                   </td>
                   <td className="p-4">
-                    <span className="inline-flex text-xs bg-[#E6E2DE] text-[#242321] px-2 py-1 rounded font-medium border border-[#DDD7CE]">
-                      {mapStatusToIndonesian(order.status)}
-                    </span>
+                    <div className="flex flex-col gap-2 items-start">
+                      <span className="inline-flex text-xs bg-[#E6E2DE] text-[#242321] px-2 py-1 rounded font-medium border border-[#DDD7CE]">
+                        {mapStatusToIndonesian(order.status)}
+                      </span>
+                      
+                      {order.revisionRequests?.[0]?.status === 'APPROVED_PAID' && (
+                        <span className="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded">
+                          ⚡ Revisi Dibayar
+                        </span>
+                      )}
+                      {order.revisionRequests?.[0]?.status === 'PENDING' && (
+                        <span className="text-xs bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded">
+                          ⚠️ Butuh Review Revisi
+                        </span>
+                      )}
+                      {order.revisionRequests?.[0]?.status === 'REQUIRES_PAYMENT' && (
+                        <span className="text-xs bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded">
+                          ⏳ Menunggu Pembayaran Buyer
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="p-4">
                     <span className={`inline-flex text-xs px-2 py-1 rounded font-medium ${order.paymentStatus === 'SUCCESS' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'}`}>
@@ -212,12 +232,15 @@ export default function AdminOrdersPage() {
                     </span>
                   </td>
                   <td className="p-4">
-                    <Link 
-                      href={`/orders/${order.id}`}
-                      className="text-sm font-medium text-[#B85C45] hover:text-[#99442F] transition-colors"
-                    >
-                      Lihat Detail
-                    </Link>
+                    <div className="flex items-center gap-3">
+                      <Link 
+                        href={`/admin/orders/${order.id}`}
+                        className="text-sm font-medium text-[#B85C45] hover:text-[#99442F] transition-colors"
+                      >
+                        Lihat Detail
+                      </Link>
+                      <OrderStatusUpdater orderId={order.id} currentStatus={order.status} />
+                    </div>
                   </td>
                 </tr>
               ))}

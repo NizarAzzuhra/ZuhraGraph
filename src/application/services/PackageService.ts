@@ -1,6 +1,8 @@
 import { Package } from '../../domain/entities/Package';
 import { PackageRepository } from '../../domain/interfaces/PackageRepository';
 import { v4 as uuidv4 } from 'uuid';
+import { prisma } from '@/lib/prisma';
+import { OrderStatus } from '@prisma/client';
 
 export class PackageService {
   constructor(private readonly packageRepository: PackageRepository) {}
@@ -56,5 +58,44 @@ export class PackageService {
 
   public async searchPackages(keyword: string): Promise<Package[]> {
     return this.packageRepository.search(keyword);
+  }
+
+  public async getPackagesWithAvailability(): Promise<any[]> {
+    
+    const activePackages = await prisma.package.findMany({
+      where: { status: 'ACTIVE' }
+    });
+
+    const activeOrderStatuses = [
+      OrderStatus.PAID,
+      OrderStatus.PROCESSING,
+      OrderStatus.REVISION_REQUESTED
+    ];
+
+    const result = [];
+
+    for (const pkg of activePackages) {
+      const activeOrdersCount = await prisma.order.count({
+        where: {
+          packageId: pkg.id,
+          status: {
+            in: activeOrderStatuses
+          }
+        }
+      });
+
+      const remainingSlots = Math.max(0, pkg.maxActiveSlots - activeOrdersCount);
+      const isOpen = pkg.isAcceptingOrders && remainingSlots > 0;
+
+      result.push({
+        ...pkg,
+        price: Number(pkg.price), // Convert Decimal to Number for frontend
+        activeOrdersCount,
+        remainingSlots,
+        isOpen
+      });
+    }
+
+    return result;
   }
 }

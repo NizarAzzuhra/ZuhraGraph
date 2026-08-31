@@ -25,6 +25,14 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
   const handleUploadStart = () => setUploadingCount(prev => prev + 1);
   const handleUploadEnd = () => setUploadingCount(prev => Math.max(0, prev - 1));
 
+  const checkAuthForUpload = () => {
+    if (status === "unauthenticated") {
+      router.push(`/login?callbackUrl=/packages/${packageData.id}`);
+      return false;
+    }
+    return true;
+  };
+
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -128,10 +136,10 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
       {/* Left Column: Forms */}
       <div className="lg:col-span-8 flex flex-col gap-12">
         {/* Package Summary Card (Mobile mostly, visible on desktop as context) */}
-        <div className="border border-outline-variant rounded-xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-surface-container-lowest">
+        <div className="border border-[#E8E0D5] rounded-xl p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#FFFFFF]">
           <div>
             <h3 className="text-headline-md font-headline-md text-on-surface mb-1">{packageData.name}</h3>
-            <div className="flex gap-4 text-caption font-caption text-on-surface-variant">
+            <div className="flex gap-4 text-caption font-caption text-[#7A7067]">
               <span className="flex items-center gap-1">
                 <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 0" }}>schedule</span>
                 3–5 hari
@@ -149,7 +157,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
         <section className="flex flex-col gap-4">
           <h2 className="text-headline-md font-headline-md text-on-surface">Brief Commission</h2>
           <div className="relative">
-            <label htmlFor="brief" className="block text-label-md font-label-md uppercase text-on-surface-variant mb-2">Deskripsi Proyek</label>
+            <label htmlFor="brief" className="block text-label-md font-label-md uppercase text-[#7A7067] mb-2">Deskripsi Proyek</label>
             <textarea
               id="brief"
               value={brief}
@@ -164,13 +172,13 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
                 <span className="material-symbols-outlined text-[14px]" style={{ fontVariationSettings: "'FILL' 1" }}>error</span> Deskripsi proyek tidak boleh melebihi 1000 karakter.
               </p>
             )}
-            <div className="flex justify-between mt-2 text-caption font-caption text-on-surface-variant">
+            <div className="flex justify-between mt-2 text-caption font-caption text-[#7A7067]">
               <span>Sertakan detail sebanyak mungkin.</span>
               <span className={brief.length > 1000 ? "text-error font-bold" : ""}>{brief.length}/1000</span>
             </div>
-            <div className="mt-4 bg-surface-container-lowest p-4 rounded-xl border border-outline-variant">
+            <div className="mt-4 bg-[#FFFFFF] p-4 rounded-xl border border-[#E8E0D5]">
               <p className="text-label-md font-label-md text-on-surface mb-2 font-medium">Butuh bantuan menulis brief?</p>
-              <ul className="text-body-md font-body-md text-on-surface-variant list-disc list-inside space-y-1">
+              <ul className="text-body-md font-body-md text-[#7A7067] list-disc list-inside space-y-1">
                 <li>Karakter dan pose</li>
                 <li>Warna yang diinginkan</li>
                 <li>Teks/konten</li>
@@ -188,7 +196,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
             <div className="flex items-center gap-2 mb-1">
               <h2 className="text-headline-md font-headline-md text-on-surface">Referensi Karakter</h2>
             </div>
-            <p className="text-caption font-caption text-on-surface-variant">Unggah gambar karakter yang ingin digunakan. (Maks 3)</p>
+            <p className="text-caption font-caption text-[#7A7067]">Unggah gambar karakter yang ingin digunakan. (Maks 3)</p>
           </div>
 
           <ReferenceUploader
@@ -201,6 +209,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
             onUploadEnd={handleUploadEnd}
             onError={setError}
             disabled={loading}
+            onBeforeUpload={checkAuthForUpload}
           />
         </section>
 
@@ -211,7 +220,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
               <h2 className="text-headline-md font-headline-md text-on-surface">Referensi Desain</h2>
               <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant text-[10px] uppercase tracking-wider font-medium">Opsional</span>
             </div>
-            <p className="text-caption font-caption text-on-surface-variant">Unggah contoh pencahayaan, warna, atau gaya komposisi yang Anda sukai. (Maks 3)</p>
+            <p className="text-caption font-caption text-[#7A7067]">Unggah contoh pencahayaan, warna, atau gaya komposisi yang Anda sukai. (Maks 3)</p>
           </div>
 
           <ReferenceUploader
@@ -224,6 +233,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
             onUploadEnd={handleUploadEnd}
             onError={setError}
             disabled={loading}
+            onBeforeUpload={checkAuthForUpload}
           />
         </section>
 
@@ -234,7 +244,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
               <h2 className="text-headline-md font-headline-md text-on-surface">Referensi Tambahan</h2>
               <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant text-[10px] uppercase tracking-wider font-medium">Opsional</span>
             </div>
-            <p className="text-caption font-caption text-on-surface-variant">Unggah referensi visual lain yang dapat membantu. (Maks 5)</p>
+            <p className="text-caption font-caption text-[#7A7067]">Unggah referensi visual lain yang dapat membantu. (Maks 5)</p>
           </div>
 
           <ReferenceUploader
@@ -247,6 +257,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
             onUploadEnd={handleUploadEnd}
             onError={setError}
             disabled={loading}
+            onBeforeUpload={checkAuthForUpload}
           />
         </section>
 
@@ -271,73 +282,81 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
       </div>
 
       {/* Right Column: Sidebar / Order Summary */}
-      <div className="lg:col-span-4 lg:self-start lg:sticky lg:top-28 relative mt-12 lg:mt-0">
-        <div className="border border-outline-variant rounded-xl p-6 bg-surface-container-lowest flex flex-col gap-6">
-          <h3 className="text-headline-md font-headline-md text-on-surface">Ringkasan Pesanan</h3>
+      <div className="lg:col-span-4">
+        <div className="bg-[#FFFFFF] border border-[#E8E0D5] rounded-3xl p-6 shadow-sm sticky top-28">
+          <h3 className="text-xl font-bold text-gray-900 mb-6">Ringkasan Pesanan</h3>
 
-          <div className="flex gap-4 items-center">
-            <div className="w-20 h-20 rounded-xl bg-surface-container overflow-hidden flex-shrink-0">
+          {/* Thumbnail & Layanan */}
+          <div className="flex items-center space-x-4 mb-6">
+            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
               <img
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuC87nJt4UTWPv2ebTjdiihduGbbF1KtcDhTsTj5QDmjYWAc7U6Wr6NuFRnNc4ImRHFoqVZHfLQW9bKUDT2F-hP64tea6OcGO9tf5ioFIm_guNlMNp4qJS04fmI2Cti53NKq1Tu2XGu30corc3S8dcYpKNP7RGtRAi3Qy5-AwPsNUfOBJGosXsn2FKyP1j6kXCT7akni73-1yUj656v-xfYbl9_WR7Q2Zr-AAd7snMICqpWVI-ntsX5H_Q"
-                alt="Package Thumbnail"
+                alt="Thumbnail"
                 className="w-full h-full object-cover"
               />
             </div>
             <div>
-              <div className="text-label-md font-label-md uppercase text-on-surface-variant mb-1">LAYANAN</div>
-              <div className="text-body-lg font-body-lg font-medium text-on-surface">{packageData.name}</div>
+              <div className="text-[11px] font-bold text-gray-400 tracking-wider uppercase mb-0.5">LAYANAN</div>
+              <div className="text-base font-bold text-gray-900">{packageData?.name || "GFX C4D Design"}</div>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 py-4 border-y border-outline-variant">
-            <div className="flex justify-between items-center text-body-md font-body-md text-on-surface-variant">
+          {/* Garis Pembatas */}
+          <div className="border-t border-[#f0eae5] my-4" />
+
+          {/* Detail Biaya */}
+          <div className="space-y-3 text-sm text-gray-600 mb-6">
+            <div className="flex justify-between">
               <span>Waktu Pengerjaan</span>
-              <span className="text-on-surface">3-5 hari</span>
+              <span className="font-semibold text-gray-900">3–5 hari</span>
             </div>
-            <div className="flex justify-between items-center text-body-md font-body-md text-on-surface-variant">
+            <div className="flex justify-between">
               <span>Harga Dasar</span>
-              <span className="text-on-surface">Rp {packageData.price.toLocaleString('id-ID')}</span>
+              <span className="font-semibold text-gray-900">
+                Rp {packageData?.price ? packageData.price.toLocaleString("id-ID") : "250.000"}
+              </span>
             </div>
           </div>
 
-          <div className="flex justify-between items-end">
-            <span className="text-headline-md font-headline-md text-on-surface">Total</span>
-            <span className="text-headline-lg font-headline-lg text-primary">Rp {packageData.price.toLocaleString('id-ID')}</span>
+          {/* Total */}
+          <div className="flex justify-between items-baseline mb-6 pt-2">
+            <span className="text-lg font-bold text-gray-900">Total</span>
+            <span className="text-2xl font-extrabold text-[#9d4b36]">
+              Rp {packageData?.price ? packageData.price.toLocaleString("id-ID") : "250.000"}
+            </span>
           </div>
 
+          {/* Pesan Error jika ada */}
           {error && (
-            <div className="p-3 bg-error-container border border-error/20 text-error rounded-xl text-sm font-medium">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-xl text-xs font-medium">
               {error}
             </div>
           )}
 
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={handleCheckout}
-              disabled={loading || isUploading || status === "loading"}
-              className="w-full bg-primary text-on-primary py-4 rounded-xl font-label-md text-label-md uppercase tracking-wider hover:bg-surface-tint transition-colors mt-2 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <><span className="material-symbols-outlined animate-spin" style={{ fontVariationSettings: "'FILL' 0" }}>progress_activity</span> Membuat Pesanan...</>
-              ) : isUploading ? "Mengunggah file..." : status === "unauthenticated" ? "Masuk untuk Pesan" : "Buat Pesanan"}
-            </button>
-            <p className="text-caption font-caption text-on-surface-variant text-center mt-2">
-              Dengan membuat pesanan, Anda menyetujui <br />
-              <span className="flex items-center justify-center gap-1 mt-1">
-                <input
-                  type="checkbox"
-                  id="terms-sidebar"
-                  checked={termsAccepted}
-                  onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="w-4 h-4 text-primary bg-transparent border-outline-variant rounded focus:ring-primary focus:ring-2 cursor-pointer"
-                />
-                <label htmlFor="terms-sidebar" className="cursor-pointer">
-                  <a href="#" className="underline hover:text-primary">Ketentuan Layanan</a> dan <a href="#" className="underline hover:text-primary">Kebijakan Commission</a>.
-                </label>
-              </span>
-            </p>
+          {/* Tombol CTA Terracotta */}
+          <button
+            type="button"
+            onClick={handleCheckout}
+            disabled={loading || isUploading || status === "loading"}
+            className="w-full py-4 bg-[#9d4b36] hover:bg-[#853e2c] active:scale-[0.99] text-white font-bold text-sm tracking-wider uppercase rounded-xl transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {loading ? "Memproses..." : isUploading ? "Mengunggah File..." : status === "unauthenticated" ? "Masuk untuk Pesan" : "BUAT PESANAN"}
+          </button>
+
+          {/* Terms Agreement */}
+          <div className="mt-4 flex items-start justify-center gap-2 text-center text-xs text-gray-500 leading-relaxed">
+            <input
+              type="checkbox"
+              id="terms-sidebar"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded text-[#9d4b36] border-gray-300 focus:ring-[#9d4b36] cursor-pointer"
+            />
+            <label htmlFor="terms-sidebar" className="cursor-pointer text-[11px] text-gray-500 text-left">
+              Dengan membuat pesanan, Anda menyetujui <a href="#" className="underline text-gray-700 hover:text-[#9d4b36]">Ketentuan Layanan</a> dan <a href="#" className="underline text-gray-700 hover:text-[#9d4b36]">Kebijakan Commission</a>.
+            </label>
           </div>
+
         </div>
       </div>
     </div>

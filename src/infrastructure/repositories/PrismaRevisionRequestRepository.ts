@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma';
-import { RevisionRequest, RevisionStatus, RevisionClassification } from '../../domain/entities/RevisionRequest';
+import { RevisionRequest, RevisionStatus, RevisionClassification, BuyerDecision } from '../../domain/entities/RevisionRequest';
 import { RevisionRequestRepository } from '../../domain/interfaces/RevisionRequestRepository';
 
 export class PrismaRevisionRequestRepository implements RevisionRequestRepository {
@@ -22,6 +22,7 @@ export class PrismaRevisionRequestRepository implements RevisionRequestRepositor
       data.classification as RevisionClassification | null,
       data.requester as 'BUYER' | 'ADMIN',
       data.reason,
+      data.buyerDecision as BuyerDecision | null,
       data.artworkVersionId,
       data.createdAt,
       data.updatedAt
@@ -36,6 +37,7 @@ export class PrismaRevisionRequestRepository implements RevisionRequestRepositor
         extraFee: request.extraFee,
         classification: request.classification,
         reason: request.reason,
+        buyerDecision: request.buyerDecision,
       },
       create: {
         id: request.id,
@@ -47,6 +49,7 @@ export class PrismaRevisionRequestRepository implements RevisionRequestRepositor
         classification: request.classification,
         requester: request.requester,
         reason: request.reason,
+        buyerDecision: request.buyerDecision,
         artworkVersionId: request.artworkVersionId,
         createdAt: request.createdAt,
       },
@@ -71,6 +74,7 @@ export class PrismaRevisionRequestRepository implements RevisionRequestRepositor
           data.classification as RevisionClassification | null,
           data.requester as 'BUYER' | 'ADMIN',
           data.reason,
+          data.buyerDecision as BuyerDecision | null,
           data.artworkVersionId,
           data.createdAt,
           data.updatedAt
@@ -100,6 +104,7 @@ export class PrismaRevisionRequestRepository implements RevisionRequestRepositor
       data.classification as RevisionClassification | null,
       data.requester as 'BUYER' | 'ADMIN',
       data.reason,
+      data.buyerDecision as BuyerDecision | null,
       data.artworkVersionId,
       data.createdAt,
       data.updatedAt

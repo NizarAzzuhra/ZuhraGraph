@@ -118,11 +118,57 @@ export class PrismaOrderRepository implements OrderRepository {
           orderBy: { createdAt: 'desc' },
           take: 1,
           select: { status: true }
+        },
+        revisionRequests: {
+          orderBy: { createdAt: 'desc' },
+          take: 1
         }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    return data.map(this.mapToSummaryDTO);
+    return data.map((d: any) => ({
+      ...this.mapToSummaryDTO(d),
+      revisionRequests: d.revisionRequests
+    }));
+  }
+
+  public async findAllForAdmin(): Promise<any[]> {
+    const data = await prisma.order.findMany({
+      include: {
+        buyer: { select: { id: true, name: true, email: true } },
+        package: { select: { name: true, price: true } },
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { status: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return data;
+  }
+
+  public async addArtwork(orderId: string, url: string, revisionNumber: number): Promise<void> {
+    await prisma.$transaction([
+      prisma.artworkVersion.create({
+        data: {
+          orderId,
+          url,
+          revisionNumber
+        }
+      }),
+      prisma.order.update({
+        where: { id: orderId },
+        data: { status: 'ARTWORK_UPLOADED' }
+      })
+    ]);
+  }
+
+  public async getArtworkCount(orderId: string): Promise<number> {
+    return prisma.artworkVersion.count({
+      where: { orderId }
+    });
   }
 }

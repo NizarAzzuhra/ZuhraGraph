@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma';
 import { Payment, PaymentStatus } from '../../domain/entities/Payment';
 import { PaymentRepository } from '../../domain/interfaces/PaymentRepository';
-
+import { Order } from '../../domain/entities/Order';
 export class PrismaPaymentRepository implements PaymentRepository {
   public async findById(id: string): Promise<Payment | null> {
     const data = await prisma.payment.findUnique({
@@ -79,6 +79,45 @@ export class PrismaPaymentRepository implements PaymentRepository {
         transactionId: payment.getTransactionId(),
         token: payment.getToken(),
       },
+    });
+  }
+
+  public async saveWithOrder(payment: Payment, order: Order): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.upsert({
+        where: { id: payment.id },
+        update: {
+          status: payment.getStatus(),
+          transactionId: payment.getTransactionId(),
+          token: payment.getToken(),
+        },
+        create: {
+          id: payment.id,
+          orderId: payment.orderId,
+          amount: payment.amount,
+          status: payment.getStatus(),
+          transactionId: payment.getTransactionId(),
+          token: payment.getToken(),
+        },
+      });
+
+      await tx.order.upsert({
+        where: { id: order.id },
+        update: {
+          status: order.getStatus(),
+          totalAmount: order.totalAmount,
+          brief: order.brief,
+        },
+        create: {
+          id: order.id,
+          buyerId: order.buyerId,
+          packageId: order.packageId,
+          totalAmount: order.totalAmount,
+          brief: order.brief,
+          status: order.getStatus(),
+          createdAt: order.createdAt,
+        },
+      });
     });
   }
 }

@@ -9,7 +9,7 @@ import { PrismaOrderRepository } from '../../../../../infrastructure/repositorie
 const orderRepository = new PrismaOrderRepository();
 const paymentRepository = new PrismaPaymentRepository();
 const paymentGateway = new MidtransPaymentGateway();
-const paymentService = new PaymentService(paymentRepository, paymentGateway);
+const paymentService = new PaymentService(paymentRepository, paymentGateway, orderRepository);
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -50,8 +50,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (error.message === 'Payment not found') {
       return NextResponse.json({ success: false, message: error.message }, { status: 404 });
     }
-    if (error.message === 'Payment is no longer pending and cannot be retried.') {
+    if (error.message === 'Payment is already successful and cannot be retried.') {
       return NextResponse.json({ success: false, message: error.message }, { status: 400 });
+    }
+    if (error.message === 'Midtrans_Network_Error') {
+      return NextResponse.json({ success: false, message: 'Layanan pembayaran sedang sibuk atau gangguan jaringan. Silakan coba lagi.' }, { status: 503 });
     }
     console.error('Retry payment error:', error);
     return NextResponse.json({

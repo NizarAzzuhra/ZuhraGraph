@@ -1,12 +1,14 @@
 import { PaymentRepository } from '../../domain/interfaces/PaymentRepository';
 import { PaymentGateway } from '../../domain/interfaces/PaymentGateway';
 import { Payment, PaymentStatus } from '../../domain/entities/Payment';
-import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
+import { OrderRepository } from '../../domain/interfaces/OrderRepository';
 
 export class PaymentService {
   constructor(
     private readonly paymentRepository: PaymentRepository,
-    private readonly paymentGateway: PaymentGateway
+    private readonly paymentGateway: PaymentGateway,
+    private readonly orderRepository?: OrderRepository
   ) {}
 
   public async getPaymentStatus(paymentId: string): Promise<PaymentStatus> {
@@ -19,13 +21,16 @@ export class PaymentService {
     const transactionId = payment.getTransactionId();
     if (transactionId && payment.getStatus() === 'PENDING') {
       try {
-        const gatewayStatus = await this.paymentGateway.getPaymentStatus(transactionId);
-        const mappedStatus = this.mapGatewayStatus(gatewayStatus);
+        const gatewayRes = await this.paymentGateway.getPaymentStatus(transactionId);
+        const mappedStatus = this.mapGatewayStatus(gatewayRes.transaction_status);
 
         if (mappedStatus !== payment.getStatus()) {
           switch (mappedStatus) {
             case 'SUCCESS':
-              payment.markAsSuccess(transactionId);
+              if (!gatewayRes.transaction_id) {
+                console.warn(`Missing transaction_id from gateway for payment ${payment.id}`);
+              }
+              payment.markAsSuccess(gatewayRes.transaction_id || transactionId);
               break;
             case 'FAILED':
               payment.markAsFailed();
@@ -37,7 +42,23 @@ export class PaymentService {
               payment.refund();
               break;
           }
-          await this.paymentRepository.save(payment);
+
+          if (mappedStatus === 'SUCCESS' && this.orderRepository) {
+            const order = await this.orderRepository.findById(payment.orderId);
+            if (order && order.getStatus() === 'AWAITING_PAYMENT') {
+              order.markAsPaid();
+              if (this.paymentRepository.saveWithOrder) {
+                await this.paymentRepository.saveWithOrder(payment, order);
+              } else {
+                await this.paymentRepository.save(payment);
+                await this.orderRepository.save(order);
+              }
+            } else {
+              await this.paymentRepository.save(payment);
+            }
+          } else {
+            await this.paymentRepository.save(payment);
+          }
         }
       } catch (error) {
         console.error('Failed to sync payment status from gateway:', error);
@@ -121,39 +142,78 @@ export class PaymentService {
     }
 
     if (status === 'PENDING') {
-      const existingToken = activePayment.getToken();
-      if (existingToken && activePayment.updatedAt) {
-        const tokenAge = Date.now() - activePayment.updatedAt.getTime();
-        const isExpired = tokenAge > 23 * 60 * 60 * 1000;
-        
-        if (!isExpired) {
-          return { token: existingToken };
+      let isMidtransUsable = false;
+
+      try {
+        // Panggil Midtrans getPaymentStatus(Payment.id) sebagai source of truth
+        const gatewayRes = await this.paymentGateway.getPaymentStatus(activePayment.id);
+        const mappedStatus = this.mapGatewayStatus(gatewayRes.transaction_status);
+
+        if (mappedStatus === 'PENDING') {
+          const existingToken = activePayment.getToken();
+          if (existingToken) {
+            // Midtrans pending dan kita punya token -> pertahankan PENDING, return token lama
+            isMidtransUsable = true;
+          } else {
+            // Midtrans pending tapi kita tidak punya token (e.g. koneksi putus saat create token dulu)
+            // Karena tidak mungkin mendapatkan token mentah dari Midtrans lagi, terpaksa kita fail-kan payment ini.
+            activePayment.markAsFailed();
+            await this.paymentRepository.save(activePayment);
+          }
+        } else if (mappedStatus === 'SUCCESS') {
+          // Midtrans = settlement/capture -> update Payment SUCCESS, jangan buat payment baru, lempar error.
+          if (!gatewayRes.transaction_id) {
+            console.warn(`Missing transaction_id from gateway for payment ${activePayment.id}`);
+          }
+          activePayment.markAsSuccess(gatewayRes.transaction_id || activePayment.getTransactionId() || activePayment.id);
+          
+          if (this.orderRepository) {
+            const order = await this.orderRepository.findById(activePayment.orderId);
+            if (order && order.getStatus() === 'AWAITING_PAYMENT') {
+              order.markAsPaid();
+              if (this.paymentRepository.saveWithOrder) {
+                await this.paymentRepository.saveWithOrder(activePayment, order);
+              } else {
+                await this.paymentRepository.save(activePayment);
+                await this.orderRepository.save(order);
+              }
+            } else {
+              await this.paymentRepository.save(activePayment);
+            }
+          } else {
+            await this.paymentRepository.save(activePayment);
+          }
+          throw new Error('Payment is already successful and cannot be retried.');
         } else {
+          // Midtrans = expire/cancel/deny -> update Payment menjadi EXPIRED/FAILED
           activePayment.markAsExpired();
           await this.paymentRepository.save(activePayment);
         }
-      } else if (!existingToken) {
-        // Token is null, which means previous initiation timed out.
-        // Reconciliation check:
-        try {
-          await this.paymentGateway.getPaymentStatus(activePayment.id);
-          // Midtrans found the transaction. Since we lost the token, we can't resume the UI.
-          activePayment.markAsFailed();
-          await this.paymentRepository.save(activePayment);
-        } catch (error: any) {
-          // Typically a 404 from Midtrans, meaning it was never created successfully.
-          activePayment.markAsFailed();
-          await this.paymentRepository.save(activePayment);
+      } catch (error: any) {
+        // Jika request status Midtrans timeout / network error -> return HTTP 503 (akan dilempar ke atas)
+        if (error.message === 'Midtrans_Network_Error') {
+          throw new Error('Midtrans_Network_Error');
         }
+        // Jika Midtrans = 404 (transaksi tidak ditemukan) -> Payment lama ditandai FAILED
+        if (error.message === 'Midtrans_404') {
+          activePayment.markAsFailed();
+          await this.paymentRepository.save(activePayment);
+        } else if (error.message === 'Payment is already successful and cannot be retried.') {
+          throw error;
+        }
+      }
+
+      if (isMidtransUsable) {
+        return { token: activePayment.getToken() as string };
       }
     }
 
     // Create a new Payment attempt
-    const newPayment = new Payment(uuidv4(), orderId, activePayment.amount, 'PENDING', null);
+    const newPayment = new Payment(crypto.randomUUID(), orderId, activePayment.amount, 'PENDING', null);
     await this.paymentRepository.save(newPayment);
 
     try {
-      const paymentInfo = await this.paymentGateway.initiatePayment(newPayment.id, newPayment.amount, buyerInfo);
+      const paymentInfo = await this.paymentGateway.initiatePayment(newPayment.id, newPayment.amount, buyerInfo, orderId);
       newPayment.setToken(paymentInfo.token);
       await this.paymentRepository.save(newPayment);
       return paymentInfo;

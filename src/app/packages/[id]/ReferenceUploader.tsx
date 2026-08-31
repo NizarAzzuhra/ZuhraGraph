@@ -17,6 +17,7 @@ interface Props {
   onUploadEnd: () => void;
   onError: (msg: string) => void;
   disabled?: boolean;
+  onBeforeUpload?: () => boolean;
 }
 
 export function ReferenceUploader({
@@ -28,7 +29,8 @@ export function ReferenceUploader({
   onUploadStart,
   onUploadEnd,
   onError,
-  disabled
+  disabled,
+  onBeforeUpload
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [localUploading, setLocalUploading] = useState(false);
@@ -43,6 +45,11 @@ export function ReferenceUploader({
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (onBeforeUpload && !onBeforeUpload()) {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -106,9 +113,11 @@ export function ReferenceUploader({
     setImages(prev => prev.filter((_, i) => i !== index));
 
     try {
-      await fetch(`/api/upload?publicId=${encodeURIComponent(imageToRemove.publicId)}`, {
-        method: 'DELETE',
-      });
+      if (imageToRemove.publicId && imageToRemove.publicId !== 'existing') {
+        await fetch(`/api/upload?publicId=${encodeURIComponent(imageToRemove.publicId)}`, {
+          method: 'DELETE',
+        });
+      }
     } catch (error) {
       console.error('Failed to cleanup image', error);
     }
@@ -119,8 +128,15 @@ export function ReferenceUploader({
       {/* Drag Drop Zone */}
       {images.length < maxFiles && !localUploading && (
         <div 
-          onClick={() => !disabled && fileInputRef.current?.click()}
-          className={`border-2 border-dashed border-outline-variant rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors group ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-surface-container-lowest'}`}
+          onClick={(e) => {
+            if (disabled) return;
+            if (onBeforeUpload && !onBeforeUpload()) {
+              e.preventDefault();
+              return;
+            }
+            fileInputRef.current?.click();
+          }}
+          className={`border-2 border-dashed border-[#DCCEC2] bg-[#F4EFEA] rounded-xl p-8 flex flex-col items-center justify-center text-center transition-colors group ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-[#E8E0D5]'}`}
         >
           <div className="w-12 h-12 bg-surface-container-highest rounded-full flex items-center justify-center mb-4 group-hover:bg-primary-container group-hover:text-on-primary transition-colors">
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 0" }}>cloud_upload</span>
@@ -128,7 +144,7 @@ export function ReferenceUploader({
           <p className="text-body-md font-body-md text-on-surface mb-1">
             <span className="font-bold">Klik untuk mengunggah</span> atau seret dan lepas
           </p>
-          <p className="text-caption font-caption text-on-surface-variant">JPG, PNG, atau WebP (maks. 10MB)</p>
+          <p className="text-caption font-caption text-[#7A7067]">JPG, PNG, atau WebP (maks. 10MB)</p>
           <input
             type="file"
             ref={fileInputRef}

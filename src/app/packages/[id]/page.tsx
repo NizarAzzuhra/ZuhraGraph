@@ -36,37 +36,31 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
     <>
       {/* Load Midtrans Script */}
       <MidtransSnap clientKey={midtransClientKey} />
-      
-      {/* Mobile Header (Simplified for task-focused flow) */}
-      <header className="md:hidden sticky top-0 z-50 bg-surface/90 backdrop-blur-md px-margin-mobile py-4 flex items-center justify-between border-b border-outline-variant">
-        <div className="flex items-center gap-2">
-          <Link href="/packages" className="p-2 -ml-2 text-on-surface rounded-full flex items-center justify-center">
-            <span className="material-symbols-outlined text-2xl" style={{ fontVariationSettings: "'FILL' 0" }}>arrow_back</span>
-          </Link>
-          <span className="text-label-md font-label-md text-on-surface-variant uppercase tracking-wider">Komisi / Brief</span>
-        </div>
-        <span className="text-body-md font-body-md font-semibold text-on-surface">Pesanan</span>
-      </header>
 
-      <main className="flex-grow px-margin-mobile md:px-gutter max-w-container-max mx-auto w-full py-8 md:py-margin-desktop flex flex-col gap-8 pb-32 md:pb-margin-desktop">
-        
-        <div className="mb-12">
-          <div className="flex items-center gap-2 text-caption font-caption text-on-surface-variant mb-6">
-            <Link href="/packages" className="hover:text-primary transition-colors">Paket</Link>
-            <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-            <Link href={`/packages#${packageData.id}`} className="hover:text-primary transition-colors">{packageData.name}</Link>
-            <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-            <span className="text-on-surface font-medium">Pesanan</span>
+      <main className="min-h-screen bg-[#FAF6F0] text-[#1F1C18] antialiased font-sans pb-20">
+        <div className="max-w-6xl mx-auto px-6 pt-12">
+          
+          {/* Breadcrumb */}
+          <div className="text-sm text-gray-500 mb-8 flex items-center space-x-2">
+            <span>Paket</span>
+            <span>&gt;</span>
+            <span>{packageData.name}</span>
+            <span>&gt;</span>
+            <span className="font-semibold text-gray-900">Pesanan</span>
           </div>
-          <h1 className="text-display-lg-mobile md:text-display-lg font-display-lg-mobile md:font-display-lg text-on-surface mb-4">
+
+          {/* Heading Utama yang Seharusnya Besar */}
+          <h1 className="text-5xl font-extrabold tracking-tight mb-4 text-gray-900">
             Ceritakan tentang proyek Anda
           </h1>
-          <p className="text-body-lg font-body-lg text-on-surface-variant max-w-3xl">
+          <p className="text-gray-600 mb-12 text-lg">
             Berikan detail dan referensi yang kami perlukan untuk membuat commission Anda.
           </p>
-        </div>
 
-        <CheckoutForm packageData={packageData} />
+          {/* Komponen Form yang sudah diperbarui */}
+          <CheckoutForm packageData={packageData} />
+
+        </div>
       </main>
     </>
   );

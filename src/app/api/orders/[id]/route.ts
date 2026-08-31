@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '../../auth/[...nextauth]/route';
+
+export const dynamic = 'force-dynamic';
 import { OrderService } from '../../../../application/services/OrderService';
 import { PaymentService } from '../../../../application/services/PaymentService';
 import { PrismaOrderRepository } from '../../../../infrastructure/repositories/PrismaOrderRepository';
@@ -10,17 +12,13 @@ import { MidtransPaymentGateway } from '../../../../infrastructure/payment/Midtr
 import { RevisionService } from '../../../../application/services/RevisionService';
 import { PrismaRevisionRequestRepository } from '../../../../infrastructure/repositories/PrismaRevisionRequestRepository';
 
-// Mock Notification Service since real one is not yet implemented
-class MockNotificationService {
-  async sendNotification(userId: string, type: string, content: string) {}
-  async markAsRead(notificationId: string) {}
-}
+import { PrismaNotificationService } from '../../../../infrastructure/services/PrismaNotificationService';
 
 const orderRepository = new PrismaOrderRepository();
 const packageRepository = new PrismaPackageRepository();
 const paymentRepository = new PrismaPaymentRepository();
 const paymentGateway = new MidtransPaymentGateway();
-const notificationService = new MockNotificationService();
+const notificationService = new PrismaNotificationService();
 
 const orderService = new OrderService(
   orderRepository,
@@ -30,14 +28,12 @@ const orderService = new OrderService(
   notificationService
 );
 
-const paymentService = new PaymentService(paymentRepository, paymentGateway);
+const paymentService = new PaymentService(paymentRepository, paymentGateway, orderRepository);
 
 const revisionRequestRepository = new PrismaRevisionRequestRepository();
 const revisionService = new RevisionService(
   orderRepository,
   revisionRequestRepository,
-  paymentRepository,
-  paymentGateway,
   notificationService
 );
 
@@ -50,17 +46,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
     
     const buyerId = (session.user as any).id;
+    const userRole = (session.user as any).role;
     const { id: orderId } = await params;
 
-    const orderDetails = await orderService.getOrderDetails(orderId, buyerId);
+    const orderDetails = await orderService.getOrderDetails(orderId, buyerId, userRole);
     const payment = await paymentService.getPaymentByOrderId(orderId);
 
     // Retrieve brief edits, revisions, and artwork versions directly via Prisma for response enrichment
     const { prisma } = await import('../../../../lib/prisma');
-    const briefEditRequests = await prisma.briefEditRequest.findMany({
-      where: { orderId },
-      orderBy: { createdAt: 'desc' }
-    });
     const revisionRequests = await prisma.revisionRequest.findMany({
       where: { orderId },
       orderBy: { createdAt: 'desc' }
@@ -74,7 +67,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       success: true,
       data: {
         ...orderDetails,
-        briefEditRequests,
         revisionRequests,
         artworkVersions
       },

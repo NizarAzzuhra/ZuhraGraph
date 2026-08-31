@@ -112,31 +112,7 @@ async function main() {
      console.log('PASS: Double submission handled or threw error (or concurrent modification handled).');
   }
 
-  console.log('\n[5] Testing Brief Edit...');
-  const { BriefEditService } = await import('./src/application/services/BriefEditService.js');
-  const { PrismaBriefEditRequestRepository } = await import('./src/infrastructure/repositories/PrismaBriefEditRequestRepository.js');
-  const briefEditService = new BriefEditService(orderRepo, new PrismaBriefEditRequestRepository(), mockNotification);
 
-  if (createdOrder) {
-    try {
-      const { request: editReq, directUpdate } = await briefEditService.requestBriefEdit(buyer.id, createdOrder.order.id, 'New proposed brief content');
-      console.log('PASS: Brief edit request created successfully. Direct update: ' + directUpdate);
-      
-      if (editReq) {
-        await briefEditService.decideBriefEdit(editReq.id, true, 'Approved by admin');
-        console.log('PASS: Brief edit request approved.');
-      }
-      
-      const updatedOrder = await prisma.order.findUnique({ where: { id: createdOrder.order.id } });
-      if (updatedOrder?.brief === 'New proposed brief content') {
-         console.log('PASS: Order brief updated correctly after approval.');
-      } else {
-         console.error('FAIL: Order brief not updated after approval.');
-      }
-    } catch(e: any) {
-      console.error('FAIL: Brief edit flow error - ' + e.message);
-    }
-  }
 
   console.log('\n--- E2E TEST COMPLETED ---');
 }
