@@ -28,6 +28,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
     price: Number(pkg.price),
     status: pkg.status,
     slot: Number(pkg.slot),
+    imageUrl: pkg.imageUrl ?? "",
   };
 
   const midtransClientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "";
@@ -42,11 +43,11 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
           
           {/* Breadcrumb */}
           <div className="text-sm text-gray-500 mb-8 flex items-center space-x-2">
-            <span>Paket</span>
-            <span>&gt;</span>
-            <span>{packageData.name}</span>
-            <span>&gt;</span>
-            <span className="font-semibold text-gray-900">Pesanan</span>
+            <Link href="/packages" className="hover:text-[var(--color-primary)] transition-colors">Paket</Link>
+            <span className="text-gray-400">&gt;</span>
+            <Link href={`/packages/${packageData.id}`} className="hover:text-[var(--color-primary)] transition-colors">{packageData.name}</Link>
+            <span className="text-gray-400">&gt;</span>
+            <span className="text-[var(--color-primary)] font-medium">Pesanan</span>
           </div>
 
           {/* Heading Utama yang Seharusnya Besar */}

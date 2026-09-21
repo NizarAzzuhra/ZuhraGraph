@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]/route';
+import { requireAdminApi } from '@/lib/auth';
 import { OrderService } from '../../../../application/services/OrderService';
 import { PrismaOrderRepository } from '../../../../infrastructure/repositories/PrismaOrderRepository';
 import { PrismaPackageRepository } from '../../../../infrastructure/repositories/PrismaPackageRepository';
@@ -31,11 +30,8 @@ const orderService = new OrderService(
 
 export async function GET(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || (session.user as any).role !== 'ADMIN') {
-      return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 });
-    }
+    const { error } = await requireAdminApi();
+    if (error) return error;
 
     const orders = await orderService.getAllOrdersForAdmin();
 

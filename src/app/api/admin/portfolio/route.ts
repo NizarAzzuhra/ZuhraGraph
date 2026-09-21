@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdminApi } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { revalidatePath } from "next/cache";
@@ -17,6 +18,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const { error } = await requireAdminApi();
+    if (error) return error;
+
     const formData = await request.formData();
     const title = formData.get("title") as string;
     const category = formData.get("category") as string;

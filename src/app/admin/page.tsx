@@ -1,7 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
+import { requireAdminPage } from "@/lib/auth";
 
 export default async function AdminDashboardPage() {
+  await requireAdminPage();
+
   // Define active order statuses based on previous mapping
   const activeStatuses = [
     OrderStatus.PAID,

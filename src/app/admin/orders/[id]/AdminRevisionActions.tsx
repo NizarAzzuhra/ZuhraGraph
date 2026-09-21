@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
 interface Props {
   orderId: string;
@@ -15,30 +16,43 @@ export default function AdminRevisionActions({ orderId, requestId, description }
   const [classification, setClassification] = useState<"ARTIST_ERROR" | "MINOR_REVISION" | "SCOPE_CHANGE">("MINOR_REVISION");
   const [extraFee, setExtraFee] = useState(0);
   const [reason, setReason] = useState("");
+  
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<boolean | null>(null);
 
-  const handleDecide = async (approve: boolean, e: React.FormEvent) => {
+  const handleDecide = (approve: boolean, e: React.FormEvent) => {
     e.preventDefault();
+    setPendingAction(approve);
+    setIsModalOpen(true);
+  };
+
+  const confirmDecide = async () => {
+    if (pendingAction === null) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/orders/${orderId}/revision-request/${requestId}/decide`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          approve,
+          approve: pendingAction,
           classification,
           extraFee: Number(extraFee),
           reason
         })
       });
       const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Gagal memproses revisi");
+      }
       if (data.success) {
         alert(data.message);
+        setIsModalOpen(false);
         router.refresh();
       } else {
         alert(data.message || "Gagal memproses revisi");
       }
-    } catch (e) {
-      alert("Terjadi kesalahan.");
+    } catch (e: any) {
+      alert(e.message || "Terjadi kesalahan.");
     } finally {
       setLoading(false);
     }
@@ -112,6 +126,21 @@ export default function AdminRevisionActions({ orderId, requestId, description }
           </button>
         </div>
       </form>
+
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        title={pendingAction ? "Konfirmasi Persetujuan Revisi" : "Konfirmasi Penolakan Revisi"}
+        message={
+          pendingAction
+            ? "Apakah Anda yakin ingin menyetujui tiket revisi ini dan mengirimkannya ke Artist?"
+            : "Apakah Anda yakin ingin menolak tiket revisi ini? Pembeli tidak akan bisa melanjutkan revisi yang ditolak."
+        }
+        confirmText={pendingAction ? "Ya, Setujui & Proses" : "Ya, Tolak Request"}
+        variant={pendingAction ? "primary" : "danger"}
+        isLoading={loading}
+        onConfirm={confirmDecide}
+        onClose={() => setIsModalOpen(false)}
+      />
     </section>
   );
 }

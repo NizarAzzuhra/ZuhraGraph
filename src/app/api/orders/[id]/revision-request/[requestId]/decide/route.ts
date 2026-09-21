@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../../../../auth/[...nextauth]/route';
+import { requireAdminApi } from '@/lib/auth';
 import { RevisionService } from '../../../../../../../application/services/RevisionService';
 import { PrismaOrderRepository } from '../../../../../../../infrastructure/repositories/PrismaOrderRepository';
 import { PrismaRevisionRequestRepository } from '../../../../../../../infrastructure/repositories/PrismaRevisionRequestRepository';
@@ -38,36 +37,33 @@ const revisionService = new RevisionService(
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string; requestId: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
-    }
-
-    const userRole = (session.user as any).role;
-    if (userRole !== 'ADMIN') {
-      return NextResponse.json({ success: false, message: 'Akses ditolak. Hanya Admin/Artist yang dapat memproses permintaan ini.' }, { status: 403 });
-    }
+    const { error } = await requireAdminApi();
+    if (error) return error;
 
     const { requestId } = await params;
-    const { approve, classification, extraFee, reason } = await req.json();
+    const payload = await req.json();
+    console.log("APPROVE REVISION PAYLOAD:", payload);
+    const { approve, classification, extraFee, reason } = payload;
 
     if (approve === undefined) {
       return NextResponse.json({ success: false, message: 'Status keputusan (approve) wajib diberikan.' }, { status: 400 });
     }
+
+    const parsedExtraFee = parseInt(extraFee as any, 10) || 0;
 
     if (approve) {
       if (!classification || !['ARTIST_ERROR', 'MINOR_REVISION', 'SCOPE_CHANGE'].includes(classification)) {
         return NextResponse.json({ success: false, message: 'Klasifikasi revisi tidak valid.' }, { status: 400 });
       }
 
-      if (extraFee === undefined || extraFee < 0) {
+      if (parsedExtraFee < 0) {
         return NextResponse.json({ success: false, message: 'Biaya tambahan wajib diisi minimal 0.' }, { status: 400 });
       }
     }
 
     const result = await revisionService.decideRevision(requestId, approve, {
       classification,
-      extraFee: extraFee || 0,
+      extraFee: parsedExtraFee,
       reason
     });
 
@@ -78,10 +74,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }, { status: 200 });
 
   } catch (error: any) {
-    console.error('Decide revision error:', error);
+    console.error('APPROVE REVISION ERROR:', error);
     return NextResponse.json({
       success: false,
       message: error.message || 'Internal Server Error'
-    }, { status: error.message.includes('tidak ditemukan') ? 404 : 400 });
+    }, { status: error.message?.includes('tidak ditemukan') ? 404 : 400 });
   }
 }

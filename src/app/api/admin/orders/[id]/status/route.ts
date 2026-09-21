@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdminApi } from "@/lib/auth";
 
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { error } = await requireAdminApi();
+    if (error) return error;
+
     // Await params properly for Next.js 15+
     const { id } = await context.params;
 

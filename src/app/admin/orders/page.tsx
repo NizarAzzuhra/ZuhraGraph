@@ -55,8 +55,9 @@ export default function AdminOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Sederhana filter implementation
+  // Filter and Search
   const [filter, setFilter] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
@@ -93,10 +94,21 @@ export default function AdminOrdersPage() {
   };
 
   const filteredOrders = orders.filter(order => {
-    if (filter === 'ALL') return true;
-    if (filter === 'WAITING') return ['PENDING', 'AWAITING_PAYMENT', 'WAITING_BUYER_CONFIRMATION'].includes(order.status);
-    if (filter === 'ACTIVE') return ['PAID', 'CONFIRMED', 'PROCESSING', 'REVISION_REQUESTED', 'PROCESSING_REVISION'].includes(order.status);
-    if (filter === 'COMPLETED') return ['COMPLETED'].includes(order.status);
+    if (filter === 'WAITING' && !['PENDING', 'AWAITING_PAYMENT', 'WAITING_BUYER_CONFIRMATION'].includes(order.status)) return false;
+    if (filter === 'ACTIVE' && !['PAID', 'CONFIRMED', 'PROCESSING', 'REVISION_REQUESTED', 'PROCESSING_REVISION'].includes(order.status)) return false;
+    if (filter === 'COMPLETED' && !['COMPLETED'].includes(order.status)) return false;
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const idMatch = order.id.toLowerCase().includes(query);
+      const nameMatch = order.buyerName.toLowerCase().includes(query);
+      const emailMatch = order.buyerEmail.toLowerCase().includes(query);
+      const packageMatch = order.packageName.toLowerCase().includes(query);
+      if (!idMatch && !nameMatch && !emailMatch && !packageMatch) {
+        return false;
+      }
+    }
+
     return true;
   });
 
@@ -124,32 +136,46 @@ export default function AdminOrdersPage() {
           <p className="text-[var(--color-secondary)]">Kelola semua pesanan masuk dan status komisi.</p>
         </div>
         
-        {/* Simple Filter */}
-        <div className="flex bg-[#F5F1EA] p-1 rounded border border-[#DDD7CE]">
-          <button 
-            onClick={() => setFilter('ALL')}
-            className={`px-4 py-1.5 text-sm font-medium rounded transition-colors ${filter === 'ALL' ? 'bg-white shadow-sm text-[var(--color-primary)]' : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'}`}
-          >
-            Semua
-          </button>
-          <button 
-            onClick={() => setFilter('ACTIVE')}
-            className={`px-4 py-1.5 text-sm font-medium rounded transition-colors ${filter === 'ACTIVE' ? 'bg-white shadow-sm text-[var(--color-primary)]' : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'}`}
-          >
-            Aktif
-          </button>
-          <button 
-            onClick={() => setFilter('WAITING')}
-            className={`px-4 py-1.5 text-sm font-medium rounded transition-colors ${filter === 'WAITING' ? 'bg-white shadow-sm text-[var(--color-primary)]' : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'}`}
-          >
-            Menunggu
-          </button>
-          <button 
-            onClick={() => setFilter('COMPLETED')}
-            className={`px-4 py-1.5 text-sm font-medium rounded transition-colors ${filter === 'COMPLETED' ? 'bg-white shadow-sm text-[var(--color-primary)]' : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'}`}
-          >
-            Selesai
-          </button>
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          {/* Search Bar */}
+          <div className="relative w-full sm:w-72">
+            <span className="material-symbols-outlined absolute left-3 top-1.5 text-[var(--color-secondary)] text-[20px]">search</span>
+            <input 
+              type="text" 
+              placeholder="Cari ID, pembeli, email, atau paket..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-1.5 text-sm rounded border border-[#DDD7CE] focus:border-[var(--color-primary)] focus:outline-none transition-colors bg-white shadow-sm"
+            />
+          </div>
+
+          {/* Simple Filter */}
+          <div className="flex bg-[#F5F1EA] p-1 rounded border border-[#DDD7CE] overflow-x-auto w-full sm:w-auto">
+            <button 
+              onClick={() => setFilter('ALL')}
+              className={`px-4 py-1.5 text-sm font-medium rounded transition-colors whitespace-nowrap ${filter === 'ALL' ? 'bg-white shadow-sm text-[var(--color-primary)]' : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'}`}
+            >
+              Semua
+            </button>
+            <button 
+              onClick={() => setFilter('ACTIVE')}
+              className={`px-4 py-1.5 text-sm font-medium rounded transition-colors whitespace-nowrap ${filter === 'ACTIVE' ? 'bg-white shadow-sm text-[var(--color-primary)]' : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'}`}
+            >
+              Aktif
+            </button>
+            <button 
+              onClick={() => setFilter('WAITING')}
+              className={`px-4 py-1.5 text-sm font-medium rounded transition-colors whitespace-nowrap ${filter === 'WAITING' ? 'bg-white shadow-sm text-[var(--color-primary)]' : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'}`}
+            >
+              Menunggu
+            </button>
+            <button 
+              onClick={() => setFilter('COMPLETED')}
+              className={`px-4 py-1.5 text-sm font-medium rounded transition-colors whitespace-nowrap ${filter === 'COMPLETED' ? 'bg-white shadow-sm text-[var(--color-primary)]' : 'text-[var(--color-secondary)] hover:text-[var(--color-primary)]'}`}
+            >
+              Selesai
+            </button>
+          </div>
         </div>
       </div>
 
@@ -167,7 +193,11 @@ export default function AdminOrdersPage() {
         <div className="text-center py-20 border border-[var(--color-border-line)] rounded bg-[var(--color-surface)]">
           <span className="material-symbols-outlined text-4xl text-[var(--color-secondary)] mb-4">inventory_2</span>
           <h2 className="text-xl font-semibold text-[var(--color-primary)] mb-2">Tidak Ada Data</h2>
-          <p className="text-[var(--color-secondary)]">Belum ada pesanan yang sesuai dengan kriteria.</p>
+          <p className="text-[var(--color-secondary)]">
+            {searchQuery 
+              ? "Tidak ada pesanan yang sesuai dengan kata kunci." 
+              : "Belum ada pesanan yang sesuai dengan kriteria."}
+          </p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded border border-[var(--color-border-line)] bg-white">

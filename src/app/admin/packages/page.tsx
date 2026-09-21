@@ -1,10 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { requireAdminPage } from "@/lib/auth";
 import ToggleCommissionButton from "@/components/ToggleCommissionButton";
 import DeletePackageButton from "@/components/admin/DeletePackageButton";
 import Link from "next/link";
 import Image from "next/image";
 
 export default async function AdminPackagesPage() {
+  await requireAdminPage();
+
   const packages = await prisma.package.findMany({
     orderBy: { createdAt: "desc" },
   });

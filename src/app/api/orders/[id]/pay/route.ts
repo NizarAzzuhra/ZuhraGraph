@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../../auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth';
 import { PaymentService } from '../../../../../application/services/PaymentService';
 import { PrismaPaymentRepository } from '../../../../../infrastructure/repositories/PrismaPaymentRepository';
 import { MidtransPaymentGateway } from '../../../../../infrastructure/payment/MidtransPaymentGateway';

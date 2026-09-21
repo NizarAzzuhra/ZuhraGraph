@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdminApi } from "@/lib/auth";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
 import { revalidatePath } from "next/cache";
@@ -9,6 +10,9 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { error } = await requireAdminApi();
+    if (error) return error;
+
     const { id } = await context.params;
     const formData = await request.formData();
     
@@ -71,6 +75,9 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { error } = await requireAdminApi();
+    if (error) return error;
+
     const { id } = await context.params;
 
     await prisma.portfolio.delete({

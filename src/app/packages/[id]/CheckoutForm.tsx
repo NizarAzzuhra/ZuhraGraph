@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { ReferenceUploader, ReferenceImage } from "./ReferenceUploader";
+import TermsModal from "../../../components/TermsModal";
 
 export default function CheckoutForm({ packageData }: { packageData: any }) {
   const { data: session, status } = useSession();
@@ -15,6 +16,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
   const [designRefs, setDesignRefs] = useState<ReferenceImage[]>([]);
   const [additionalRefs, setAdditionalRefs] = useState<ReferenceImage[]>([]);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
@@ -24,6 +26,10 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
 
   const handleUploadStart = () => setUploadingCount(prev => prev + 1);
   const handleUploadEnd = () => setUploadingCount(prev => Math.max(0, prev - 1));
+
+  const thumbnailSrc = packageData?.imageUrl || packageData?.image || packageData?.image_url || "https://lh3.googleusercontent.com/aida-public/AB6AXuC87nJt4UTWPv2ebTjdiihduGbbF1KtcDhTsTj5QDmjYWAc7U6Wr6NuFRnNc4ImRHFoqVZHfLQW9bKUDT2F-hP64tea6OcGO9tf5ioFIm_guNlMNp4qJS04fmI2Cti53NKq1Tu2XGu30corc3S8dcYpKNP7RGtRAi3Qy5-AwPsNUfOBJGosXsn2FKyP1j6kXCT7akni73-1yUj656v-xfYbl9_WR7Q2Zr-AAd7snMICqpWVI-ntsX5H_Q";
+
+  console.log("Package Data di CheckoutForm:", packageData);
 
   const checkAuthForUpload = () => {
     if (status === "unauthenticated") {
@@ -288,11 +294,11 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
 
           {/* Thumbnail & Layanan */}
           <div className="flex items-center space-x-4 mb-6">
-            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+            <div className="w-16 h-16 rounded-xl bg-gray-50 overflow-hidden flex items-center justify-center shrink-0 border border-gray-200">
               <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuC87nJt4UTWPv2ebTjdiihduGbbF1KtcDhTsTj5QDmjYWAc7U6Wr6NuFRnNc4ImRHFoqVZHfLQW9bKUDT2F-hP64tea6OcGO9tf5ioFIm_guNlMNp4qJS04fmI2Cti53NKq1Tu2XGu30corc3S8dcYpKNP7RGtRAi3Qy5-AwPsNUfOBJGosXsn2FKyP1j6kXCT7akni73-1yUj656v-xfYbl9_WR7Q2Zr-AAd7snMICqpWVI-ntsX5H_Q"
-                alt="Thumbnail"
-                className="w-full h-full object-cover"
+                src={thumbnailSrc}
+                alt={packageData?.name || "Thumbnail"}
+                className="w-full h-full object-cover object-center"
               />
             </div>
             <div>
@@ -350,15 +356,30 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
               id="terms-sidebar"
               checked={termsAccepted}
               onChange={(e) => setTermsAccepted(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded text-[#9d4b36] border-gray-300 focus:ring-[#9d4b36] cursor-pointer"
+              className="mt-0.5 w-4 h-4 rounded text-[#9d4b36] border-gray-300 focus:ring-[#9d4b36] cursor-pointer flex-shrink-0"
             />
-            <label htmlFor="terms-sidebar" className="cursor-pointer text-[11px] text-gray-500 text-left">
-              Dengan membuat pesanan, Anda menyetujui <a href="#" className="underline text-gray-700 hover:text-[#9d4b36]">Ketentuan Layanan</a> dan <a href="#" className="underline text-gray-700 hover:text-[#9d4b36]">Kebijakan Commission</a>.
-            </label>
+            <div className="text-[11px] text-gray-500 text-left">
+              <label htmlFor="terms-sidebar" className="cursor-pointer">
+                Dengan membuat pesanan, Anda menyetujui
+              </label>{" "}
+              <button 
+                type="button" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsTermsOpen(true);
+                }} 
+                className="underline cursor-pointer font-medium text-gray-700 hover:text-[#9d4b36]"
+              >
+                Ketentuan Layanan dan Kebijakan Commission
+              </button>.
+            </div>
           </div>
 
         </div>
       </div>
+
+      <TermsModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />
     </div>
   );
 }

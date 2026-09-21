@@ -71,7 +71,14 @@ export class RevisionService {
       `Permintaan revisi baru untuk pesanan ${order.id} telah diajukan.`
     );
     if (this.notificationService.sendToAdmins) {
-      await this.notificationService.sendToAdmins('REVISION_REQUESTED', `Permintaan revisi baru diajukan untuk Pesanan #${order.id}`, `/admin/orders/${order.id}`);
+      try {
+        const buyer = await prisma.user.findUnique({ where: { id: order.buyerId } });
+        const buyerName = buyer?.name || 'Klien';
+        await this.notificationService.sendToAdmins('REVISION_REQUESTED', `Klien ${buyerName} mengajukan revisi untuk pesanan #${order.id}.`, `/admin/orders/${order.id}`);
+      } catch (e) {
+        console.error("Failed to fetch buyer for notification", e);
+        await this.notificationService.sendToAdmins('REVISION_REQUESTED', `Klien mengajukan revisi untuk pesanan #${order.id}.`, `/admin/orders/${order.id}`);
+      }
     }
 
     return request;

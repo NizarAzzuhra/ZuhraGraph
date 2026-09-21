@@ -6,6 +6,7 @@ import { PackageRepository } from '../../domain/interfaces/PackageRepository';
 import { Payment } from '../../domain/entities/Payment';
 import { PaymentRepository } from '../../domain/interfaces/PaymentRepository';
 import { v4 as uuidv4 } from 'uuid';
+import { prisma } from '../../lib/prisma';
 
 export class OrderService {
   // Dependency Injection via constructor
@@ -139,7 +140,14 @@ export class OrderService {
     
     await this.notificationService.sendNotification(order.buyerId, 'ORDER_COMPLETED', `Order ${order.id} has been completed.`);
     if (this.notificationService.sendToAdmins) {
-      await this.notificationService.sendToAdmins('ORDER_COMPLETED', `Pesanan #${order.id} telah diterima dan diselesaikan oleh buyer`, `/admin/orders/${order.id}`);
+      try {
+        const buyer = await prisma.user.findUnique({ where: { id: order.buyerId } });
+        const buyerName = buyer?.name || 'Klien';
+        await this.notificationService.sendToAdmins('ORDER_COMPLETED', `Klien ${buyerName} telah menyetujui hasil akhir pesanan #${order.id}.`, `/admin/orders/${order.id}`);
+      } catch (e) {
+        console.error("Failed to fetch buyer for notification", e);
+        await this.notificationService.sendToAdmins('ORDER_COMPLETED', `Klien telah menyetujui hasil akhir pesanan #${order.id}.`, `/admin/orders/${order.id}`);
+      }
     }
     
     return order;

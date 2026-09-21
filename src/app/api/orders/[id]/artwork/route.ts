@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../../auth/[...nextauth]/route';
+import { requireAdminApi } from '@/lib/auth';
 import { PrismaOrderRepository } from '../../../../../infrastructure/repositories/PrismaOrderRepository';
 import { prisma } from '../../../../../lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,15 +8,8 @@ const orderRepository = new PrismaOrderRepository();
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
-    }
-
-    const userRole = (session.user as any).role;
-    if (userRole !== 'ADMIN') {
-      return NextResponse.json({ success: false, message: 'Akses ditolak. Hanya Admin/Artist yang dapat mengunggah hasil desain.' }, { status: 403 });
-    }
+    const { error } = await requireAdminApi();
+    if (error) return error;
 
     const { id: orderId } = await params;
     const { url } = await req.json();

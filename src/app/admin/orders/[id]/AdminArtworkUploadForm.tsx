@@ -94,8 +94,8 @@ export default function AdminArtworkUploadForm({ orderId, currentStatus }: { ord
         ) : (
           <div className="flex flex-col items-center justify-center pointer-events-none">
             <span className="material-symbols-outlined text-[var(--color-secondary)] text-4xl mb-4">cloud_upload</span>
-            <div className="text-sm font-semibold text-[var(--color-primary)] uppercase mb-2">Drag & Drop Files Here</div>
-            <div className="text-xs text-[var(--color-secondary)]">or click to browse from device</div>
+            <div className="text-sm font-semibold text-[var(--color-primary)] uppercase mb-2">Tarik & lepas berkas ke sini</div>
+            <div className="text-xs text-[var(--color-secondary)]">atau klik untuk memilih</div>
             <div className="text-xs text-gray-400 mt-4">Supported: PDF, TIFF, JPG (Max 500MB)</div>
           </div>
         )}
@@ -106,7 +106,7 @@ export default function AdminArtworkUploadForm({ orderId, currentStatus }: { ord
         disabled={isLoading || !file}
         className="w-full px-6 py-3 bg-[var(--color-primary)] text-white text-sm font-semibold uppercase rounded hover:bg-[#333] transition-colors disabled:opacity-50"
       >
-        {isLoading ? "Uploading..." : "Upload File"}
+        {isLoading ? "Mengunggah..." : "Unggah Artwork"}
       </button>
     </form>
   );

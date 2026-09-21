@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { requireAdminPage } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import OrderStatusUpdater from "@/components/admin/OrderStatusUpdater";
@@ -6,6 +7,7 @@ import AdminArtworkUploadForm from "./AdminArtworkUploadForm";
 import AdminRevisionActions from "./AdminRevisionActions";
 
 export default async function AdminOrderDetailPage(props: { params: Promise<{ id: string }> }) {
+  await requireAdminPage();
   const { id } = await props.params;
 
   const order = await prisma.order.findUnique({
@@ -74,15 +76,15 @@ export default async function AdminOrderDetailPage(props: { params: Promise<{ id
           <section className="bg-white border border-[#DDD7CE] rounded p-6 shadow-sm">
             <div className="flex justify-between items-start mb-6 pb-6 border-b border-[#DDD7CE]">
               <div>
-                <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-1">Order #{order.id}</h2>
-                <p className="text-sm text-[var(--color-secondary)]">Commissioned on {new Date(order.createdAt).toLocaleDateString()}</p>
+                <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-1">Pesanan #{order.id}</h2>
+                <p className="text-sm text-[var(--color-secondary)]">Dipesan pada {new Date(order.createdAt).toLocaleDateString()}</p>
               </div>
               <OrderStatusUpdater orderId={order.id} currentStatus={order.status} />
             </div>
             
             <div className="grid grid-cols-2 gap-6 mb-8">
               <div>
-                <h3 className="text-xs font-semibold text-[var(--color-secondary)] uppercase mb-3">Client Details</h3>
+                <h3 className="text-xs font-semibold text-[var(--color-secondary)] uppercase mb-3">Detail Klien</h3>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-[#F5F1EA] flex items-center justify-center font-bold text-[#B85C45]">
                     {order.buyer.name[0]?.toUpperCase()}
@@ -94,14 +96,14 @@ export default async function AdminOrderDetailPage(props: { params: Promise<{ id
                 </div>
               </div>
               <div>
-                <h3 className="text-xs font-semibold text-[var(--color-secondary)] uppercase mb-3">Package Info</h3>
+                <h3 className="text-xs font-semibold text-[var(--color-secondary)] uppercase mb-3">Informasi Paket</h3>
                 <div className="font-medium text-[var(--color-primary)]">{order.package.name}</div>
                 <div className="text-sm text-[var(--color-secondary)] mt-1">Rp {Number(order.totalAmount).toLocaleString('id-ID')}</div>
               </div>
             </div>
 
             <div>
-              <h3 className="text-xs font-semibold text-[var(--color-secondary)] uppercase mb-3">Initial Brief & Notes</h3>
+              <h3 className="text-xs font-semibold text-[var(--color-secondary)] uppercase mb-3">Brief Awal & Catatan Proyek</h3>
               <p className="text-[var(--color-primary)] leading-relaxed whitespace-pre-wrap">
                 {parsedBrief?.description || order.brief || "No additional notes provided."}
               </p>
@@ -110,9 +112,9 @@ export default async function AdminOrderDetailPage(props: { params: Promise<{ id
                   {parsedBrief.notes}
                 </p>
               )}
-              {renderImageGrid("Character References", parsedBrief?.characterReferences)}
-              {renderImageGrid("Design References", parsedBrief?.designReferences)}
-              {renderImageGrid("Additional References", parsedBrief?.additionalReferences)}
+              {renderImageGrid("Referensi Karakter", parsedBrief?.characterReferences)}
+              {renderImageGrid("Referensi Desain", parsedBrief?.designReferences)}
+              {renderImageGrid("Referensi Tambahan", parsedBrief?.additionalReferences)}
             </div>
           </section>
 
@@ -154,31 +156,49 @@ export default async function AdminOrderDetailPage(props: { params: Promise<{ id
             <AdminArtworkUploadForm orderId={order.id} currentStatus={order.status} />
 
             <div>
-              <h3 className="text-xs font-semibold text-[var(--color-secondary)] uppercase mb-4 pb-2 border-b border-[#DDD7CE]">Delivery History</h3>
+              <h3 className="text-xs font-semibold text-[var(--color-secondary)] uppercase mb-4 pb-2 border-b border-[#DDD7CE]">Riwayat Pengiriman Desain</h3>
               {order.artworkVersions && order.artworkVersions.length > 0 ? (
-                <ul className="flex flex-col gap-4">
+                <ul className="flex flex-col gap-6">
                   {order.artworkVersions.map((art, index) => (
-                    <li key={art.id} className={`flex items-start gap-3 ${index > 0 ? "opacity-60" : ""}`}>
-                      <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${index === 0 ? "bg-[#B85C45]" : "bg-[#DDD7CE]"}`}></div>
-                      <div>
-                        <div className="text-sm font-medium text-[var(--color-primary)]">
-                          {art.url ? art.url.split('/').pop() : "Version " + art.revisionNumber}
-                        </div>
-                        <div className="text-xs text-[var(--color-secondary)] mt-0.5">
-                          {new Date(art.createdAt).toLocaleDateString()} at {new Date(art.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    <li key={art.id} className={`flex flex-col gap-2 ${index > 0 ? "opacity-80" : ""}`}>
+                      <div className="flex items-start gap-3">
+                        <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${index === 0 ? "bg-[#B85C45]" : "bg-[#DDD7CE]"}`}></div>
+                        <div className="flex-1 w-full overflow-hidden">
+                          <div className="mb-2">
+                            <div className="text-sm font-bold text-[var(--color-primary)]">
+                              Versi {art.revisionNumber}
+                            </div>
+                            <div className="text-xs text-[var(--color-secondary)] mt-0.5">
+                              {new Date(art.createdAt).toLocaleDateString()} at {new Date(art.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </div>
+                          </div>
+                          
+                          {art.url && (
+                            <div className="mt-2">
+                              <img 
+                                src={art.url} 
+                                alt={`Artwork Versi ${art.revisionNumber}`} 
+                                className="w-full h-auto object-cover rounded border border-[#DDD7CE] mb-2" 
+                              />
+                              <div className="flex items-center justify-between bg-[#F5F1EA] p-2.5 rounded border border-[#DDD7CE]">
+                                <span className="text-xs text-[var(--color-primary)] truncate flex-1 mr-2" title={art.url.split('/').pop()}>
+                                  {art.url.split('/').pop()}
+                                </span>
+                                <a 
+                                  href={art.url} 
+                                  download
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex-shrink-0 flex items-center gap-1.5 text-xs font-semibold text-[#B85C45] hover:opacity-70 transition-opacity bg-white border border-[#DDD7CE] px-3 py-1.5 rounded shadow-sm"
+                                >
+                                  <span className="material-symbols-outlined text-sm">download</span>
+                                  Unduh Desain
+                                </a>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                      {art.url && (
-                        <a 
-                          href={art.url} 
-                          download
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-auto text-[var(--color-secondary)] hover:text-[#B85C45] transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-sm">download</span>
-                        </a>
-                      )}
                     </li>
                   ))}
                 </ul>

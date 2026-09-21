@@ -4,24 +4,24 @@ import React, { useState } from 'react';
 
 const faqItems = [
   {
-    question: "What is the typical timeline for a commission?",
-    answer: "Timelines vary significantly based on the complexity and medium of the piece. Generally, standard digital portraits take 2-3 weeks, while intricate concept pieces or full scene illustrations may require 4-8 weeks. A specific timeline will be established during our initial consultation and detailed in the commission agreement."
+    question: "Berapa lama estimasi waktu pengerjaan komisi?",
+    answer: "Waktu pengerjaan umumnya memakan waktu 3–5 hari kerja tergantung pada kompleksitas paket yang dipilih serta antrean aktif saat ini."
   },
   {
-    question: "How does the payment process work?",
-    answer: "I require a 50% non-refundable deposit upfront before any sketch work begins. This secures your spot in my queue. The remaining 50% is due upon completion and approval of the final watermarked artwork, prior to the delivery of the high-resolution files. Payments are accepted via standard wire transfer or Midtrans."
+    question: "Bagaimana alur dan metode pembayarannya?",
+    answer: "Pembayaran dilakukan di awal secara lunas melalui Payment Gateway terintegrasi (Midtrans) yang mendukung berbagai metode pembayaran seperti QRIS (GoPay, OVO, DANA) dan Transfer Virtual Account Bank."
   },
   {
-    question: "Are revisions included?",
-    answer: "Yes, standard commissions include up to three revision rounds. The first occurs at the initial sketch phase (major structural changes allowed). The second is during the block-in/color comp phase (color and mood adjustments). The final revision is near completion for minor detailing. Additional revisions beyond these stages are billed at an hourly rate."
+    question: "Apakah sudah termasuk kuota revisi?",
+    answer: "Ya, kami memberlakukan 3 klasifikasi revisi: Artist Error (gratis tanpa memotong kuota), Minor Revision (penyesuaian kecil sesuai kuota paket), dan Scope Change (perubahan konsep besar di luar brief awal dengan biaya tambahan)."
   },
   {
-    question: "Who retains the copyright and usage rights?",
-    answer: "As the creator, I retain full copyright of the artwork. Unless explicitly negotiated otherwise, commissions are for personal use only (e.g., displaying in your home, using as a personal avatar). Commercial rights (using the art for profit, branding, or merchandise) require a separate commercial license and an adjusted pricing structure."
+    question: "Siapa yang memegang hak cipta dan lisensi penggunaan karya?",
+    answer: "Hak cipta karya (*copyright*) tetap menjadi milik desainer/artist. Klien mendapatkan lisensi penuh untuk penggunaan personal (*Personal Use*). Untuk kebutuhan komersial atau merchandise, silakan komunikasikan terlebih dahulu untuk lisensi komersial."
   },
   {
-    question: "Do you provide physical prints?",
-    answer: "ZuhraGraph specializes in premium digital art. Final deliverables are high-resolution digital files (typically TIFF and JPEG). I do not handle printing in-house, but I am happy to recommend reputable fine art printing services to ensure your piece is reproduced with the highest fidelity."
+    question: "Apakah menyediakan cetak fisik?",
+    answer: "Layanan kami murni pengiriman berkas digital berkualitas tinggi (High-Resolution File) seperti format PNG, JPG, atau file master sesuai kesepakatan paket tanpa cetak fisik."
   }
 ];
 
@@ -37,10 +37,10 @@ export default function FAQPage() {
       
       <header className="max-w-3xl mb-16 md:mb-24">
         <h1 className="text-4xl md:text-[64px] font-display-lg-mobile md:font-display-lg text-[var(--color-primary)] mb-6 font-bold tracking-tight">
-          Frequently Asked Questions
+          Pertanyaan yang Sering Diajukan
         </h1>
         <p className="text-lg font-body-lg text-[var(--color-secondary)] leading-relaxed">
-          Details on timelines, payment structures, usage rights, and the commission process. If your question isn't answered here, feel free to reach out directly.
+          Rincian mengenai estimasi waktu pengerjaan, skema pembayaran, hak cipta & lisensi, serta alur komisi. Jika ada pertanyaan yang belum terjawab di sini, silakan hubungi kami secara langsung.
         </p>
       </header>
 
@@ -72,13 +72,18 @@ export default function FAQPage() {
 
       {/* Contact CTA */}
       <div className="mt-24 max-w-3xl p-8 border border-[var(--color-border-line)] rounded bg-white">
-        <h3 className="text-3xl font-headline-lg font-semibold text-[var(--color-primary)] mb-4">Still have questions?</h3>
+        <h3 className="text-3xl font-headline-lg font-semibold text-[var(--color-primary)] mb-4">Masih punya pertanyaan?</h3>
         <p className="text-base font-body-md text-[var(--color-secondary)] mb-6 leading-relaxed">
-          If your specific inquiry wasn't covered, please reach out directly. I aim to respond to all inquiries within 48 hours.
+          Jika pertanyaan spesifik Anda belum terjawab, silakan hubungi kami secara langsung. Kami berupaya merespons semua pesan secepat mungkin.
         </p>
-        <button className="inline-flex items-center justify-center bg-transparent text-[var(--color-primary)] border border-[var(--color-primary)] rounded px-6 py-3 text-sm font-label-md hover:bg-[#f6e4e0] hover:border-transparent transition-all duration-200">
-          Contact Support
-        </button>
+        <a 
+          href="https://mail.google.com/mail/?view=cm&fs=1&to=nizarazzuhra@gmail.com&su=Tanya%20Layanan%20Komisi%20-%20ZuhraGraph" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center bg-transparent text-[var(--color-primary)] border border-[var(--color-primary)] rounded px-6 py-3 text-sm font-label-md hover:bg-[#f6e4e0] hover:border-transparent transition-all duration-200"
+        >
+          Hubungi Kami
+        </a>
       </div>
 
     </div>

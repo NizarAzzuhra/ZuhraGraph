@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { requireAdminPage } from "@/lib/auth";
 import DeletePortfolioButton from "@/components/admin/DeletePortfolioButton";
 import Link from "next/link";
 import Image from "next/image";
 
 export default async function AdminPortfolioPage() {
+  await requireAdminPage();
+
   const portfolios = await prisma.portfolio.findMany({
     orderBy: { createdAt: "desc" },
   });

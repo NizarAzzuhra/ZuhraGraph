@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
 interface Props {
   orderId: string;
@@ -24,34 +25,49 @@ const STATUS_OPTIONS = [
 
 export default function OrderStatusUpdater({ orderId, currentStatus }: Props) {
   const [status, setStatus] = useState(currentStatus);
+  const [confirmedStatus, setConfirmedStatus] = useState(currentStatus);
+  const [pendingStatus, setPendingStatus] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleStatusChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
     setStatus(newStatus);
+    setPendingStatus(newStatus);
+    setIsModalOpen(true);
+  };
+  
+  const handleCancel = () => {
+    setStatus(confirmedStatus);
+    setIsModalOpen(false);
+  };
+
+  const confirmStatusChange = async () => {
     setIsLoading(true);
 
     try {
       const res = await fetch(`/api/admin/orders/${orderId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: pendingStatus }),
       });
 
       if (!res.ok) {
         const errorData = await res.json();
         alert(`Error: ${errorData.error || res.statusText}`);
         // Revert UI if error
-        setStatus(currentStatus);
+        setStatus(confirmedStatus);
         return;
       }
 
+      setConfirmedStatus(pendingStatus);
+      setIsModalOpen(false);
       router.refresh();
     } catch (error) {
       console.error("Failed to update status:", error);
       alert("An unexpected error occurred.");
-      setStatus(currentStatus);
+      setStatus(confirmedStatus);
     } finally {
       setIsLoading(false);
     }
@@ -76,6 +92,18 @@ export default function OrderStatusUpdater({ orderId, currentStatus }: Props) {
       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#6B7280]">
         <span className="material-symbols-outlined text-sm">expand_more</span>
       </div>
+
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        title="Konfirmasi Perubahan Status"
+        message={`Apakah Anda yakin ingin mengubah status pesanan ini menjadi ${pendingStatus.replace(/_/g, " ")}?`}
+        confirmText="Ya, Ubah Status"
+        cancelText="Batal"
+        variant="warning"
+        isLoading={isLoading}
+        onConfirm={confirmStatusChange}
+        onClose={handleCancel}
+      />
     </div>
   );
 }

@@ -1,10 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 
 export default function CreatePortfolioPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    } else if (status === "authenticated" && (session?.user as any)?.role !== "ADMIN") {
+      router.push("/");
+    }
+  }, [status, session, router]);
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -13,7 +25,14 @@ export default function CreatePortfolioPage() {
   const [image, setImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
+
+  if (status === "loading" || (status === "authenticated" && (session?.user as any)?.role !== "ADMIN")) {
+    return (
+      <div className="min-h-[50vh] flex items-center justify-center text-[#7A7067]">
+        Memverifikasi otorisasi admin...
+      </div>
+    );
+  }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
