@@ -22,7 +22,9 @@ export class PrismaPackageRepository implements PackageRepository {
       data.price.toNumber(), // Convert Decimal to number
       data.status as 'ACTIVE' | 'INACTIVE',
       data.slot,
-      data.imageUrl
+      data.imageUrl,
+      data.isAcceptingOrders,
+      data.maxActiveSlots
     );
   }
 
@@ -40,7 +42,9 @@ export class PrismaPackageRepository implements PackageRepository {
       d.price.toNumber(),
       d.status as 'ACTIVE' | 'INACTIVE',
       d.slot,
-      d.imageUrl
+      d.imageUrl,
+      d.isAcceptingOrders,
+      d.maxActiveSlots
     ));
   }
 
@@ -53,7 +57,9 @@ export class PrismaPackageRepository implements PackageRepository {
         price: pkg.price, // Prisma accepts number for Decimal field
         status: pkg.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
         slot: pkg.slot,
-        imageUrl: pkg.imageUrl
+        imageUrl: pkg.imageUrl,
+        isAcceptingOrders: pkg.isAcceptingOrders,
+        maxActiveSlots: pkg.maxActiveSlots
       },
       create: {
         id: pkg.id,
@@ -62,7 +68,9 @@ export class PrismaPackageRepository implements PackageRepository {
         price: pkg.price,
         status: pkg.status === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE',
         slot: pkg.slot,
-        imageUrl: pkg.imageUrl
+        imageUrl: pkg.imageUrl,
+        isAcceptingOrders: pkg.isAcceptingOrders,
+        maxActiveSlots: pkg.maxActiveSlots
       }
     });
   }
@@ -92,7 +100,9 @@ export class PrismaPackageRepository implements PackageRepository {
       d.price.toNumber(),
       d.status as 'ACTIVE' | 'INACTIVE',
       d.slot,
-      d.imageUrl
+      d.imageUrl,
+      d.isAcceptingOrders,
+      d.maxActiveSlots
     ));
   }
 }

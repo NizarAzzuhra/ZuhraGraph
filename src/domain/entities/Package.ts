@@ -6,7 +6,9 @@ export class Package {
     public readonly price: number,
     public readonly status: 'ACTIVE' | 'INACTIVE',
     public readonly slot: number,
-    public readonly imageUrl?: string | null
+    public readonly imageUrl?: string | null,
+    public readonly isAcceptingOrders: boolean = true,
+    public readonly maxActiveSlots: number = 3
   ) {
     if (!name || name.trim() === '') {
       throw new Error('Package name cannot be empty');

@@ -1,4 +1,4 @@
-import { Order, OrderStatus } from '../../domain/entities/Order';
+import { Order, OrderStatus, ACTIVE_COMMISSION_STATUSES } from '../../domain/entities/Order';
 import { OrderRepository } from '../../domain/interfaces/OrderRepository';
 import { PaymentGateway } from '../../domain/interfaces/PaymentGateway';
 import { NotificationService } from '../../domain/interfaces/NotificationService';
@@ -19,58 +19,111 @@ export class OrderService {
   ) {}
 
   public async createOrder(buyerId: string, packageId: string, brief: string, buyerInfo: any) {
-    const pkg = await this.packageRepository.findById(packageId);
-    if (!pkg) {
-      throw new Error('Package not found');
-    }
-    if (pkg.status !== 'ACTIVE') {
-      throw new Error('Package is not active');
-    }
     if (!brief || brief.trim() === '') {
       throw new Error('Brief cannot be empty');
     }
 
-    // Anti-double submission check (10 seconds window)
-    const tenSecondsAgo = new Date(Date.now() - 10000);
-    const recentOrders = await this.orderRepository.findAllByBuyerId(buyerId);
-    if (recentOrders && recentOrders.length > 0) {
-      const duplicate = recentOrders.find((o: any) => o.packageId === packageId && o.createdAt >= tenSecondsAgo);
+    // Eksekusi pemeriksaan slot dan pembuatan pesanan dalam satu transaksi atomik
+    const { order, payment } = await prisma.$transaction(async (tx) => {
+      const pkgData = await tx.package.findFirst({
+        where: { id: packageId, deletedAt: null }
+      });
+
+      if (!pkgData) {
+        throw new Error('Package not found');
+      }
+      if (pkgData.status !== 'ACTIVE') {
+        throw new Error('Package is not active');
+      }
+      if (!pkgData.isAcceptingOrders) {
+        throw new Error('Komisi untuk paket ini sedang ditutup oleh artist.');
+      }
+
+      // Cek ketersediaan antrean/slot aktif di dalam transaksi
+      const activeOrdersCount = await tx.order.count({
+        where: {
+          packageId: pkgData.id,
+          status: { in: ACTIVE_COMMISSION_STATUSES as any },
+        },
+      });
+
+      if (activeOrdersCount >= pkgData.maxActiveSlots) {
+        throw new Error('Antrean komisi untuk paket ini sedang penuh.');
+      }
+
+      // Anti-double submission check (10 seconds window) di dalam transaksi
+      const tenSecondsAgo = new Date(Date.now() - 10000);
+      const duplicate = await tx.order.findFirst({
+        where: {
+          buyerId,
+          packageId,
+          createdAt: { gte: tenSecondsAgo }
+        }
+      });
       if (duplicate) {
         throw new Error('Duplicate order detected. Please wait a moment before creating another order.');
       }
-    }
 
-    const amount = pkg.price;
+      const amount = pkgData.price.toNumber();
+      const orderId = uuidv4();
+      const paymentId = uuidv4();
 
-    // 1. Create domain entity (Status starts as PENDING implicitly in constructor)
-    const order = new Order(uuidv4(), buyerId, packageId, amount, brief);
-    
-    // 2. Transition status to AWAITING_PAYMENT
-    order.submit();
+      // Buat data pesanan
+      const newOrderRecord = await tx.order.create({
+        data: {
+          id: orderId,
+          buyerId,
+          packageId,
+          status: 'AWAITING_PAYMENT',
+          totalAmount: amount,
+          brief,
+        }
+      });
 
-    // 3. Persist entity
-    await this.orderRepository.save(order);
+      // Buat data pembayaran
+      const newPaymentRecord = await tx.payment.create({
+        data: {
+          id: paymentId,
+          orderId,
+          amount,
+          status: 'PENDING',
+        }
+      });
 
-    // 4. Create Payment domain entity and save BEFORE Midtrans call
-    const payment = new Payment(uuidv4(), order.id, amount, 'PENDING', null);
-    await this.paymentRepository.save(payment);
+      const orderEntity = new Order(
+        newOrderRecord.id,
+        newOrderRecord.buyerId,
+        newOrderRecord.packageId,
+        Number(newOrderRecord.totalAmount),
+        newOrderRecord.brief,
+        newOrderRecord.status as OrderStatus,
+        newOrderRecord.createdAt
+      );
 
-    // 5. Initiate payment using Payment.id as Midtrans order_id
+      const paymentEntity = new Payment(
+        newPaymentRecord.id,
+        newPaymentRecord.orderId,
+        Number(newPaymentRecord.amount),
+        newPaymentRecord.status as any,
+        null
+      );
+
+      return { order: orderEntity, payment: paymentEntity };
+    });
+
+    // Inisiasi pembayaran ke Midtrans di luar transaksi database
     let paymentInfo = null;
     let paymentError = false;
     try {
-      paymentInfo = await this.paymentGateway.initiatePayment(payment.id, amount, buyerInfo, order.id);
-      
-      // 6. Set token and Save Payment again if successful
+      paymentInfo = await this.paymentGateway.initiatePayment(payment.id, payment.amount, buyerInfo, order.id);
       payment.setToken(paymentInfo.token);
       await this.paymentRepository.save(payment);
     } catch (error) {
       console.error('Midtrans initiation failed during create order:', error);
       paymentError = true;
-      // Order and Payment are already saved. We return partial success.
     }
 
-    // 7. Send notification
+    // Kirim notifikasi
     await this.notificationService.sendNotification(buyerId, 'ORDER_CREATED', `Order ${order.id} created. Please complete payment.`);
     if (this.notificationService.sendToAdmins) {
       await this.notificationService.sendToAdmins('ORDER_CREATED', `Pesanan baru masuk dari ${buyerInfo?.name || 'Buyer'}`, `/admin/orders/${order.id}`);
@@ -198,14 +251,56 @@ export class OrderService {
     return this.orderRepository.findAllForAdmin();
   }
 
-  public async updateOrderStatus(orderId: string, status: OrderStatus) {
+  public async updateOrderStatus(orderId: string, status: OrderStatus, adminId?: string) {
     const order = await this.orderRepository.findById(orderId);
     if (!order) {
       throw new Error('Order not found');
     }
     
+    const previousStatus = order.getStatus();
     order.adminUpdateStatus(status);
     await this.orderRepository.save(order);
+
+    // Record to OrderStatusHistory
+    try {
+      await prisma.orderStatusHistory.create({
+        data: {
+          id: uuidv4(),
+          orderId: order.id,
+          status: status as any,
+        }
+      });
+    } catch (e) {
+      console.error('Failed to log order status history:', e);
+    }
+
+    // Record audit log with admin ID, previous status, and new status
+    try {
+      await prisma.auditLog.create({
+        data: {
+          id: uuidv4(),
+          userId: adminId || null,
+          activityType: 'ORDER_STATUS_CHANGED',
+          entityType: 'Order',
+          entityId: order.id,
+          detail: JSON.stringify({
+            fromStatus: previousStatus,
+            toStatus: status,
+            changedByAdminId: adminId || 'SYSTEM',
+            changedAt: new Date().toISOString()
+          })
+        }
+      });
+    } catch (e) {
+      console.error('Failed to log audit log for order status change:', e);
+    }
+
+    // Send notification to buyer
+    await this.notificationService.sendNotification(
+      order.buyerId,
+      'SYSTEM',
+      `Pesanan Anda (ID: ...${order.id.slice(-8)}) kini dalam status: ${status.replace(/_/g, ' ')}.`
+    );
     
     return order;
   }

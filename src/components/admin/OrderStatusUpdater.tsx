@@ -9,19 +9,19 @@ interface Props {
   currentStatus: string;
 }
 
-const STATUS_OPTIONS = [
-  "PENDING",
-  "AWAITING_PAYMENT",
-  "PAID",
-  "CONFIRMED",
-  "PROCESSING",
-  "ARTWORK_UPLOADED",
-  "WAITING_BUYER_CONFIRMATION",
-  "REVISION_REQUESTED",
-  "PROCESSING_REVISION",
-  "COMPLETED",
-  "CANCELLED",
-];
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  PENDING: ['AWAITING_PAYMENT', 'CANCELLED'],
+  AWAITING_PAYMENT: ['CANCELLED'],
+  PAID: ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED: ['PROCESSING', 'CANCELLED'],
+  PROCESSING: ['ARTWORK_UPLOADED', 'CANCELLED'],
+  ARTWORK_UPLOADED: ['WAITING_BUYER_CONFIRMATION', 'PROCESSING', 'CANCELLED'],
+  WAITING_BUYER_CONFIRMATION: ['REVISION_REQUESTED', 'COMPLETED'],
+  REVISION_REQUESTED: ['PROCESSING_REVISION', 'WAITING_BUYER_CONFIRMATION', 'CANCELLED'],
+  PROCESSING_REVISION: ['ARTWORK_UPLOADED', 'WAITING_BUYER_CONFIRMATION', 'CANCELLED'],
+  COMPLETED: [],
+  CANCELLED: [],
+};
 
 export default function OrderStatusUpdater({ orderId, currentStatus }: Props) {
   const [status, setStatus] = useState(currentStatus);
@@ -31,8 +31,12 @@ export default function OrderStatusUpdater({ orderId, currentStatus }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  const availableNextStatuses = VALID_TRANSITIONS[confirmedStatus] || [];
+  const isTerminal = availableNextStatuses.length === 0;
+
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newStatus = e.target.value;
+    if (newStatus === confirmedStatus) return;
     setStatus(newStatus);
     setPendingStatus(newStatus);
     setIsModalOpen(true);
@@ -55,23 +59,33 @@ export default function OrderStatusUpdater({ orderId, currentStatus }: Props) {
 
       if (!res.ok) {
         const errorData = await res.json();
-        alert(`Error: ${errorData.error || res.statusText}`);
-        // Revert UI if error
+        alert(`Gagal: ${errorData.message || errorData.error || res.statusText}`);
         setStatus(confirmedStatus);
+        setIsModalOpen(false);
         return;
       }
 
       setConfirmedStatus(pendingStatus);
+      setStatus(pendingStatus);
       setIsModalOpen(false);
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to update status:", error);
-      alert("An unexpected error occurred.");
+      alert("Terjadi kesalahan yang tidak terduga.");
       setStatus(confirmedStatus);
+      setIsModalOpen(false);
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isTerminal) {
+    return (
+      <span className="inline-flex items-center px-3 py-1.5 rounded-lg border border-[#EADCC9] bg-[#F5F1EA] text-xs font-semibold text-[#7A7067] uppercase tracking-wider">
+        {confirmedStatus.replace(/_/g, " ")} (Final)
+      </span>
+    );
+  }
 
   return (
     <div className="relative inline-block">
@@ -83,9 +97,12 @@ export default function OrderStatusUpdater({ orderId, currentStatus }: Props) {
           isLoading ? "opacity-50 cursor-not-allowed" : "hover:bg-[#FAF6F0]"
         } focus:border-[#EADCC9] focus:ring-0 uppercase tracking-wider`}
       >
-        {STATUS_OPTIONS.map((opt) => (
+        <option value={confirmedStatus} disabled>
+          {confirmedStatus.replace(/_/g, " ")} (Saat ini)
+        </option>
+        {availableNextStatuses.map((opt) => (
           <option key={opt} value={opt}>
-            {opt.replace(/_/g, " ")}
+            ➜ {opt.replace(/_/g, " ")}
           </option>
         ))}
       </select>

@@ -72,7 +72,13 @@ export class OrderController {
       if (error.message === 'Package not found') {
         return NextResponse.json({ success: false, message: error.message }, { status: 404 });
       }
-      if (error.message === 'Package is not active') {
+      if (
+        error.message === 'Package is not active' ||
+        error.message?.includes('Komisi untuk paket ini sedang ditutup') ||
+        error.message?.includes('Antrean komisi untuk paket ini sedang penuh') ||
+        error.message?.includes('Duplicate order') ||
+        error.message === 'Brief cannot be empty'
+      ) {
         return NextResponse.json({ success: false, message: error.message }, { status: 400 });
       }
       return NextResponse.json({
