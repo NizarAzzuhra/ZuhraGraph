@@ -104,8 +104,13 @@ export class RevisionService {
     }
 
     if (approve) {
-      const { classification, extraFee, reason } = decisionData;
+      let { classification, extraFee, reason } = decisionData;
       
+      // Paksa extraFee = 0 jika kesalahan dari artis (ARTIST_ERROR) di level backend
+      if (classification === 'ARTIST_ERROR') {
+        extraFee = 0;
+      }
+
       const revisionCount = classification === 'MINOR_REVISION' ? 1 : 0;
       request.approve(classification, extraFee, revisionCount, reason);
       await this.revisionRequestRepository.save(request);
@@ -117,10 +122,11 @@ export class RevisionService {
           `Permintaan revisi Anda untuk pesanan ${order.id} membutuhkan BIAYA TAMBAHAN sebesar Rp ${extraFee.toLocaleString('id-ID')}. Silakan periksa detail pesanan Anda.`
         );
       } else {
+        const freeReason = classification === 'ARTIST_ERROR' ? ' karena merupakan koreksi kesalahan artist (bebas biaya)' : '';
         await this.notificationService.sendNotification(
           order.buyerId,
           'SYSTEM',
-          `Permintaan revisi Anda untuk pesanan ${order.id} telah DISETUJUI secara GRATIS.`
+          `Permintaan revisi Anda untuk pesanan ${order.id} telah DISETUJUI secara GRATIS${freeReason}.`
         );
       }
 

@@ -57,11 +57,6 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
       return;
     }
 
-    if (characterRefs.length === 0) {
-      setError("Referensi Karakter wajib diunggah (minimal 1 gambar).");
-      return;
-    }
-
     if (!termsAccepted) {
       setError("Anda harus menyetujui Ketentuan Layanan Commission untuk melanjutkan.");
       return;
@@ -196,18 +191,19 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
           </div>
         </section>
 
-        {/* Character References */}
+        {/* Character / Design Asset References */}
         <section className="flex flex-col gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-headline-md font-headline-md text-on-surface">Referensi Karakter</h2>
+              <h2 className="text-headline-md font-headline-md text-on-surface">Referensi Karakter / Aset Desain</h2>
+              <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant text-[10px] uppercase tracking-wider font-medium">Opsional</span>
             </div>
-            <p className="text-caption font-caption text-[#7A7067]">Unggah gambar karakter yang ingin digunakan. (Maks 3)</p>
+            <p className="text-caption font-caption text-[#7A7067]">Unggah gambar karakter atau aset visual yang ingin digunakan jika ada. (Maks 3)</p>
           </div>
 
           <ReferenceUploader
-            title="Referensi Karakter"
-            description="Unggah gambar karakter utama yang akan digunakan dalam desain. (Wajib)"
+            title="Referensi Karakter / Aset"
+            description="Unggah gambar karakter utama atau aset visual sebagai panduan desain. (Opsional)"
             maxFiles={3}
             images={characterRefs}
             setImages={setCharacterRefs}

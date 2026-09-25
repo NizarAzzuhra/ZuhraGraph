@@ -49,11 +49,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ success: false, message: 'Status keputusan (approve) wajib diberikan.' }, { status: 400 });
     }
 
-    const parsedExtraFee = parseInt(extraFee as any, 10) || 0;
+    let parsedExtraFee = parseInt(extraFee as any, 10) || 0;
 
     if (approve) {
       if (!classification || !['ARTIST_ERROR', 'MINOR_REVISION', 'SCOPE_CHANGE'].includes(classification)) {
         return NextResponse.json({ success: false, message: 'Klasifikasi revisi tidak valid.' }, { status: 400 });
+      }
+
+      // Paksa extraFee = 0 di level route/backend jika ARTIST_ERROR
+      if (classification === 'ARTIST_ERROR') {
+        parsedExtraFee = 0;
       }
 
       if (parsedExtraFee < 0) {

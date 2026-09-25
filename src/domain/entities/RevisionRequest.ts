@@ -65,11 +65,14 @@ export class RevisionRequest {
       throw new Error('Hanya permintaan revisi berstatus PENDING yang dapat diproses.');
     }
     
+    // Paksa extraFee = 0 jika ARTIST_ERROR di level domain entity
+    const effectiveFee = classification === 'ARTIST_ERROR' ? 0 : extraFee;
+
     this.classification = classification;
-    this.extraFee = extraFee;
+    this.extraFee = effectiveFee;
     this.reason = reason || null;
 
-    if (extraFee > 0) {
+    if (effectiveFee > 0) {
       this.status = 'REQUIRES_PAYMENT';
       this.buyerDecision = 'PENDING';
     } else {

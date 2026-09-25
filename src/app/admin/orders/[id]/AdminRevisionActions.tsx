@@ -74,24 +74,35 @@ export default function AdminRevisionActions({ orderId, requestId, description }
             <select 
               name="classification"
               value={classification}
-              onChange={(e: any) => setClassification(e.target.value)}
+              onChange={(e: any) => {
+                const val = e.target.value;
+                setClassification(val);
+                if (val === 'ARTIST_ERROR') {
+                  setExtraFee(0);
+                }
+              }}
               className="w-full bg-transparent border border-[#DDD7CE] p-3 text-base text-[var(--color-primary)] focus:border-[var(--color-primary)] focus:ring-0 transition-colors rounded appearance-none"
             >
-              <option value="ARTIST_ERROR">Koreksi Artis</option>
+              <option value="ARTIST_ERROR">Koreksi Artis (Bebas Biaya)</option>
               <option value="MINOR_REVISION">Revisi Minor</option>
               <option value="SCOPE_CHANGE">Scope Change</option>
             </select>
           </div>
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-semibold text-[var(--color-primary)] uppercase">Extra Fee (If Applicable)</label>
+            <label className="text-sm font-semibold text-[var(--color-primary)] uppercase">
+              Extra Fee {classification === 'ARTIST_ERROR' ? '(Bebas Biaya untuk Koreksi Artis)' : '(Jika Berlaku)'}
+            </label>
             <div className="relative">
               <span className="absolute left-4 top-3.5 text-base text-[var(--color-secondary)]">Rp</span>
               <input 
                 name="extraFee" 
-                className="w-full bg-transparent border border-[#DDD7CE] p-3 pl-12 text-base text-[var(--color-primary)] focus:border-[var(--color-primary)] focus:ring-0 transition-colors rounded" 
+                className={`w-full bg-transparent border border-[#DDD7CE] p-3 pl-12 text-base text-[var(--color-primary)] focus:border-[var(--color-primary)] focus:ring-0 transition-colors rounded ${
+                  classification === 'ARTIST_ERROR' ? 'bg-[#F5F1EA] cursor-not-allowed opacity-60' : ''
+                }`} 
                 type="number" 
                 min={0}
-                value={extraFee} 
+                value={classification === 'ARTIST_ERROR' ? 0 : extraFee} 
+                disabled={classification === 'ARTIST_ERROR'}
                 onChange={(e) => setExtraFee(Number(e.target.value))}
               />
             </div>

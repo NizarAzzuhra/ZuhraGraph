@@ -20,19 +20,22 @@ const notificationService = new PrismaNotificationService();
 
 const orderService = new OrderService(orderRepository, packageRepository, paymentRepository, paymentGateway, notificationService);
 
-const createOrderSchema = z.object({
+export const createOrderSchema = z.object({
   packageId: z.string().uuid("Invalid package ID"),
   brief: z.string().refine((val) => {
     try {
       const parsed = JSON.parse(val);
       if (!parsed.description || parsed.description.trim() === '') return false;
       if (parsed.description.length > 1000) return false;
-      if (!parsed.characterReferences || !Array.isArray(parsed.characterReferences) || parsed.characterReferences.length === 0) return false;
+      // Referensi aset/desain (characterReferences, designReferences, additionalReferences) bersifat opsional
+      if (parsed.characterReferences !== undefined && !Array.isArray(parsed.characterReferences)) return false;
+      if (parsed.designReferences !== undefined && !Array.isArray(parsed.designReferences)) return false;
+      if (parsed.additionalReferences !== undefined && !Array.isArray(parsed.additionalReferences)) return false;
       return true;
     } catch {
       return false;
     }
-  }, "Format brief tidak valid. Pastikan deskripsi tidak kosong, tidak lebih dari 1000 karakter, dan minimal menyertakan 1 referensi karakter."),
+  }, "Format brief tidak valid. Pastikan deskripsi proyek terisi dan tidak melebihi 1000 karakter."),
   termsAccepted: z.boolean().refine(val => val === true, "Persetujuan Ketentuan Layanan wajib diberikan."),
   buyerInfo: z.any().optional()
 });
