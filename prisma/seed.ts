@@ -36,13 +36,6 @@ async function main() {
     },
   });
 
-  const queue = await prisma.queue.create({
-    data: {
-      currentSlot: 0,
-      maxSlot: 10,
-    }
-  });
-
   const pkg = await prisma.package.create({
     data: {
       name: 'Standard Commission',
@@ -52,7 +45,7 @@ async function main() {
     }
   });
 
-  console.log({ admin, buyer, queue, pkg });
+  console.log({ admin, buyer, pkg });
 }
 
 main()
