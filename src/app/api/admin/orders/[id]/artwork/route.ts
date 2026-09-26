@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { requireAdminApi } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
 import { revalidatePath } from 'next/cache';
+import { CloudinaryStorageService } from '@/infrastructure/storage/CloudinaryStorageService';
 
 export const dynamic = 'force-dynamic';
+
+const storageService = new CloudinaryStorageService();
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,19 +21,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ success: false, message: 'File artwork wajib disertakan.' }, { status: 400 });
     }
 
-    // Save the file securely to public/uploads/artworks/
+    // Upload artwork to Cloudinary
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "artworks");
-    await mkdir(uploadDir, { recursive: true });
-
-    const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const uniqueFilename = `${Date.now()}-${safeFilename}`;
-    const filepath = path.join(uploadDir, uniqueFilename);
-
-    await writeFile(filepath, buffer);
-    const artworkUrl = `/uploads/artworks/${uniqueFilename}`;
+    const uploadResult = await storageService.uploadImage(buffer, 'artworks');
+    const artworkUrl = uploadResult.url;
 
     // Get order to determine current revision number
     const order = await prisma.order.findUnique({

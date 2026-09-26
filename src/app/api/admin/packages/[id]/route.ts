@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminApi } from "@/lib/auth";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
 import { revalidatePath } from "next/cache";
+import { CloudinaryStorageService } from "@/infrastructure/storage/CloudinaryStorageService";
+
+const storageService = new CloudinaryStorageService();
 
 export async function PATCH(
   request: Request,
@@ -30,22 +30,13 @@ export async function PATCH(
 
     let imageUrl;
 
-    // 3. Handle File Upload Safely
+    // 3. Handle File Upload Safely via Cloudinary
     if (image && image.name && image.size > 0) {
       const bytes = await image.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      // Ensure the target directory exists before writing
-      const uploadDir = path.join(process.cwd(), "public", "uploads", "packages");
-      await mkdir(uploadDir, { recursive: true });
-
-      // Clean filename and write
-      const safeFilename = image.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const uniqueFilename = `${Date.now()}-${safeFilename}`;
-      const filepath = path.join(uploadDir, uniqueFilename);
-      
-      await writeFile(filepath, buffer);
-      imageUrl = `/uploads/packages/${uniqueFilename}`;
+      const uploadResult = await storageService.uploadImage(buffer, "packages");
+      imageUrl = uploadResult.url;
     }
 
     // 4. Prepare Update Object
@@ -81,6 +72,8 @@ export async function PATCH(
     });
 
     revalidatePath("/packages");
+    revalidatePath(`/packages/${id}`);
+    revalidatePath("/admin/packages");
 
     return NextResponse.json(updatedPackage);
   } catch (error: any) {
@@ -119,6 +112,8 @@ export async function DELETE(
     });
 
     revalidatePath("/packages");
+    revalidatePath(`/packages/${id}`);
+    revalidatePath("/admin/packages");
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: any) {

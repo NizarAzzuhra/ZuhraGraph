@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdminApi } from "@/lib/auth";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
 import { revalidatePath } from "next/cache";
+import { CloudinaryStorageService } from "@/infrastructure/storage/CloudinaryStorageService";
+
+const storageService = new CloudinaryStorageService();
 
 export async function POST(request: Request) {
   try {
@@ -30,20 +30,8 @@ export async function POST(request: Request) {
       const bytes = await image.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      // Create unique filename
-      const ext = path.extname(image.name) || '.jpg';
-      const filename = `${uuidv4()}${ext}`;
-      const uploadDir = path.join(process.cwd(), "public/uploads/packages");
-      const filePath = path.join(uploadDir, filename);
-
-      // Ensure directory exists
-      await mkdir(uploadDir, { recursive: true });
-
-      // Save file
-      await writeFile(filePath, buffer);
-      
-      // The public URL path
-      imageUrl = `/uploads/packages/${filename}`;
+      const uploadResult = await storageService.uploadImage(buffer, "packages");
+      imageUrl = uploadResult.url;
     }
 
     let features: string[] = [];
@@ -71,6 +59,7 @@ export async function POST(request: Request) {
     });
 
     revalidatePath("/packages");
+    revalidatePath("/admin/packages");
 
     return NextResponse.json(newPackage, { status: 201 });
   } catch (error: any) {
