@@ -11,6 +11,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
   const router = useRouter();
 
   const [brief, setBrief] = useState("");
+  const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [characterRefs, setCharacterRefs] = useState<ReferenceImage[]>([]);
   const [designRefs, setDesignRefs] = useState<ReferenceImage[]>([]);
@@ -44,6 +45,11 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
 
     if (status === "unauthenticated") {
       router.push(`/login?callbackUrl=/packages/${packageData.id}`);
+      return;
+    }
+
+    if (!phone.trim()) {
+      setError("Nomor WhatsApp/telepon wajib diisi untuk koordinasi pesanan.");
       return;
     }
 
@@ -89,7 +95,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
           buyerInfo: {
             first_name: session?.user?.name || "Buyer",
             email: session?.user?.email || "buyer@example.com",
-            phone: "08123456789"
+            phone: phone.trim()
           }
         })
       });
@@ -153,6 +159,29 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
           </div>
           <div className="text-headline-md font-headline-md text-primary">Rp {packageData.price.toLocaleString('id-ID')}</div>
         </div>
+
+        {/* Contact Information (Phone / WhatsApp) */}
+        <section className="flex flex-col gap-4">
+          <h2 className="text-headline-md font-headline-md text-on-surface">Informasi Kontak</h2>
+          <div>
+            <label htmlFor="phone" className="block text-label-md font-label-md uppercase text-[#7A7067] mb-2">
+              Nomor WhatsApp / Telepon <span className="text-[#9d4b36] font-bold">*</span>
+            </label>
+            <input
+              type="tel"
+              id="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Contoh: 081234567890"
+              required
+              disabled={loading}
+              className="w-full bg-transparent border border-outline-variant focus:border-on-surface focus:ring-0 p-4 text-body-md font-body-md rounded-xl transition-colors disabled:opacity-50"
+            />
+            <p className="text-caption font-caption text-[#7A7067] mt-1">
+              Nomor ini digunakan untuk konfirmasi status pengerjaan, notifikasi pesanan, dan koordinasi dengan desainer/artis.
+            </p>
+          </div>
+        </section>
 
         {/* Brief Textarea */}
         <section className="flex flex-col gap-4">

@@ -1,15 +1,22 @@
-import { PrismaClient } from '@prisma/client';
+import 'dotenv/config';
+import { prisma } from '../src/lib/prisma';
 import * as bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
-
 async function main() {
-  const adminPassword = await bcrypt.hash('admin123', 10);
-  const buyerPassword = await bcrypt.hash('buyer123', 10);
+  const adminPasswordPlain = process.env.ADMIN_PASSWORD;
+  if (!adminPasswordPlain) {
+    throw new Error('ADMIN_PASSWORD environment variable is not defined. Please set ADMIN_PASSWORD before running seed.');
+  }
+
+  const adminPassword = await bcrypt.hash(adminPasswordPlain, 10);
+  const buyerPasswordPlain = process.env.BUYER_PASSWORD || 'buyer123';
+  const buyerPassword = await bcrypt.hash(buyerPasswordPlain, 10);
 
   const admin = await prisma.user.upsert({
     where: { email: 'admin@zuhra.com' },
-    update: {},
+    update: {
+      passwordHash: adminPassword,
+    },
     create: {
       name: 'Zuhra Admin',
       email: 'admin@zuhra.com',
