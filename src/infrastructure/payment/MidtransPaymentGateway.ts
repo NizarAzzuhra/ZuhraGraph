@@ -3,13 +3,16 @@ import midtransClient from 'midtrans-client';
 
 export class MidtransPaymentGateway implements PaymentGateway {
   private snap: any;
+  private coreApi: any;
 
   constructor() {
-    this.snap = new midtransClient.Snap({
+    const config = {
       isProduction: process.env.MIDTRANS_ENVIRONMENT === 'production',
       serverKey: process.env.MIDTRANS_SERVER_KEY || 'dummy_server_key',
       clientKey: process.env.MIDTRANS_CLIENT_KEY || 'dummy_client_key'
-    });
+    };
+    this.snap = new midtransClient.Snap(config);
+    this.coreApi = new midtransClient.CoreApi(config);
   }
 
   public async initiatePayment(orderId: string, amount: number, buyerInfo: any, zuhraGraphOrderId: string): Promise<PaymentInitiationResult> {
@@ -78,5 +81,16 @@ export class MidtransPaymentGateway implements PaymentGateway {
       }
       throw new Error('Midtrans_Network_Error');
     }
+  }
+
+  public async refundPayment(transactionId: string, parameter: { refund_key?: string; amount?: number; reason?: string }): Promise<any> {
+    const payload: any = {
+      refund_key: parameter.refund_key || `refund-${Date.now()}`,
+      reason: parameter.reason || 'Admin requested refund'
+    };
+    if (parameter.amount !== undefined && parameter.amount !== null) {
+      payload.amount = parameter.amount;
+    }
+    return await this.coreApi.transaction.refund(transactionId, payload);
   }
 }

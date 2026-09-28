@@ -3,6 +3,7 @@ import { requireAdminPage } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import OrderStatusUpdater from "@/components/admin/OrderStatusUpdater";
+import AdminRefundButton from "@/components/admin/AdminRefundButton";
 import AdminAutoRefresher from "@/components/admin/AdminAutoRefresher";
 import AdminArtworkUploadForm from "./AdminArtworkUploadForm";
 import AdminRevisionActions from "./AdminRevisionActions";
@@ -83,7 +84,14 @@ export default async function AdminOrderDetailPage(props: { params: Promise<{ id
                 <h2 className="text-2xl font-bold text-[var(--color-primary)] mb-1">Pesanan #{order.id}</h2>
                 <p className="text-sm text-[var(--color-secondary)]">Dipesan pada {new Date(order.createdAt).toLocaleDateString()}</p>
               </div>
-              <OrderStatusUpdater orderId={order.id} currentStatus={order.status} />
+              <div className="flex flex-wrap items-center gap-3">
+                <AdminRefundButton
+                  orderId={order.id}
+                  currentStatus={order.status}
+                  totalAmount={Number(order.totalAmount)}
+                />
+                <OrderStatusUpdater orderId={order.id} currentStatus={order.status} />
+              </div>
             </div>
             
             <div className="grid grid-cols-2 gap-6 mb-8">
