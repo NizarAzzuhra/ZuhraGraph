@@ -63,16 +63,17 @@ export class MidtransPaymentGateway implements PaymentGateway {
     return hash === signature;
   }
 
-  public async getPaymentStatus(transactionId: string): Promise<{ transaction_status: string, transaction_id: string }> {
+  public async getPaymentStatus(transactionId: string): Promise<{ transaction_status: string, transaction_id: string, fraud_status?: string }> {
     try {
       const response = await this.snap.transaction.status(transactionId);
       return {
         transaction_status: response.transaction_status,
-        transaction_id: response.transaction_id || transactionId // Fallback to parameter just in case
+        transaction_id: response.transaction_id || transactionId, // Fallback to parameter just in case
+        fraud_status: response.fraud_status
       };
     } catch (error: any) {
       console.error('Midtrans getPaymentStatus error:', error);
-      if (error.httpStatusCode === 404 || (error.message && error.message.includes('404'))) {
+      if (error.httpStatusCode === 404 || error.httpStatusCode === '404' || (error.message && error.message.includes('404'))) {
         throw new Error('Midtrans_404');
       }
       throw new Error('Midtrans_Network_Error');

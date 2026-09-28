@@ -105,19 +105,38 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
       if (data.success) {
         if (data.data?.paymentInfo?.token) {
           if (typeof window.snap !== 'undefined') {
+            const orderId = data.data.order.id;
+            const syncStatus = async () => {
+              try {
+                await fetch(`/api/orders/${orderId}/sync`, { method: 'POST' });
+              } catch (syncErr) {
+                console.error("Failed to sync payment status:", syncErr);
+              }
+            };
+
             window.snap.pay(data.data.paymentInfo.token, {
-              onSuccess: function () {
-                router.push(`/orders/${data.data.order.id}`);
+              onSuccess: async function () {
+                await syncStatus();
+                router.push(`/orders/${orderId}`);
+                router.refresh();
               },
-              onPending: function () {
-                router.push(`/orders/${data.data.order.id}`);
+              onPending: async function () {
+                await syncStatus();
+                router.push(`/orders/${orderId}`);
+                router.refresh();
               },
-              onError: function () {
+              onError: async function () {
+                await syncStatus();
                 setError("Pembayaran gagal! Silakan coba lagi dari halaman detail pesanan.");
-                setTimeout(() => router.push(`/orders/${data.data.order.id}`), 2000);
+                setTimeout(() => {
+                  router.push(`/orders/${orderId}`);
+                  router.refresh();
+                }, 2000);
               },
-              onClose: function () {
-                router.push(`/orders/${data.data.order.id}`);
+              onClose: async function () {
+                await syncStatus();
+                router.push(`/orders/${orderId}`);
+                router.refresh();
               }
             });
           } else {

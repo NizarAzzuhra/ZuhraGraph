@@ -118,6 +118,15 @@ export class PrismaPaymentRepository implements PaymentRepository {
           createdAt: order.createdAt,
         },
       });
+
+      if (order.getStatus() === 'PAID') {
+        await tx.orderStatusHistory.create({
+          data: {
+            orderId: order.id,
+            status: 'PAID',
+          },
+        });
+      }
     });
   }
 }

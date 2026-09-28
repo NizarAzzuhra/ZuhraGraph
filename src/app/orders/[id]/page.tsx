@@ -63,10 +63,11 @@ export default function OrderDetailPage() {
           });
           
           router.replace(window.location.pathname);
+          await syncPaymentStatus();
           router.refresh();
           fetchOrderDetails();
         } catch (e) {
-          console.error("Failed to sync revision payment", e);
+          console.error("Failed to sync payment status on redirect", e);
         }
       };
       
@@ -116,6 +117,7 @@ export default function OrderDetailPage() {
     try {
       await fetch(`/api/orders/${orderId}/sync`, { method: 'POST' });
       await fetchOrderDetails();
+      router.refresh();
     } catch (error) {
       console.error('Failed to sync payment status', error);
     }
