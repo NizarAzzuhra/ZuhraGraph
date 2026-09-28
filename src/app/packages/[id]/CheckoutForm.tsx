@@ -4,17 +4,20 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { ReferenceUploader, ReferenceImage } from "./ReferenceUploader";
+import TermsModal from "../../../components/TermsModal";
 
 export default function CheckoutForm({ packageData }: { packageData: any }) {
   const { data: session, status } = useSession();
   const router = useRouter();
 
   const [brief, setBrief] = useState("");
+  const [phone, setPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [characterRefs, setCharacterRefs] = useState<ReferenceImage[]>([]);
   const [designRefs, setDesignRefs] = useState<ReferenceImage[]>([]);
   const [additionalRefs, setAdditionalRefs] = useState<ReferenceImage[]>([]);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [uploadingCount, setUploadingCount] = useState(0);
@@ -24,6 +27,10 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
 
   const handleUploadStart = () => setUploadingCount(prev => prev + 1);
   const handleUploadEnd = () => setUploadingCount(prev => Math.max(0, prev - 1));
+
+  const thumbnailSrc = packageData?.imageUrl || packageData?.image || packageData?.image_url || "https://lh3.googleusercontent.com/aida-public/AB6AXuC87nJt4UTWPv2ebTjdiihduGbbF1KtcDhTsTj5QDmjYWAc7U6Wr6NuFRnNc4ImRHFoqVZHfLQW9bKUDT2F-hP64tea6OcGO9tf5ioFIm_guNlMNp4qJS04fmI2Cti53NKq1Tu2XGu30corc3S8dcYpKNP7RGtRAi3Qy5-AwPsNUfOBJGosXsn2FKyP1j6kXCT7akni73-1yUj656v-xfYbl9_WR7Q2Zr-AAd7snMICqpWVI-ntsX5H_Q";
+
+  console.log("Package Data di CheckoutForm:", packageData);
 
   const checkAuthForUpload = () => {
     if (status === "unauthenticated") {
@@ -41,6 +48,11 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
       return;
     }
 
+    if (!phone.trim()) {
+      setError("Nomor WhatsApp/telepon wajib diisi untuk koordinasi pesanan.");
+      return;
+    }
+
     if (!brief.trim()) {
       setError("Deskripsi proyek wajib diisi.");
       return;
@@ -48,11 +60,6 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
 
     if (brief.length > 1000) {
       setError("Deskripsi proyek tidak boleh lebih dari 1000 karakter.");
-      return;
-    }
-
-    if (characterRefs.length === 0) {
-      setError("Referensi Karakter wajib diunggah (minimal 1 gambar).");
       return;
     }
 
@@ -88,7 +95,7 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
           buyerInfo: {
             first_name: session?.user?.name || "Buyer",
             email: session?.user?.email || "buyer@example.com",
-            phone: "08123456789"
+            phone: phone.trim()
           }
         })
       });
@@ -98,19 +105,38 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
       if (data.success) {
         if (data.data?.paymentInfo?.token) {
           if (typeof window.snap !== 'undefined') {
+            const orderId = data.data.order.id;
+            const syncStatus = async () => {
+              try {
+                await fetch(`/api/orders/${orderId}/sync`, { method: 'POST' });
+              } catch (syncErr) {
+                console.error("Failed to sync payment status:", syncErr);
+              }
+            };
+
             window.snap.pay(data.data.paymentInfo.token, {
-              onSuccess: function () {
-                router.push(`/orders/${data.data.order.id}`);
+              onSuccess: async function () {
+                await syncStatus();
+                router.push(`/orders/${orderId}`);
+                router.refresh();
               },
-              onPending: function () {
-                router.push(`/orders/${data.data.order.id}`);
+              onPending: async function () {
+                await syncStatus();
+                router.push(`/orders/${orderId}`);
+                router.refresh();
               },
-              onError: function () {
+              onError: async function () {
+                await syncStatus();
                 setError("Pembayaran gagal! Silakan coba lagi dari halaman detail pesanan.");
-                setTimeout(() => router.push(`/orders/${data.data.order.id}`), 2000);
+                setTimeout(() => {
+                  router.push(`/orders/${orderId}`);
+                  router.refresh();
+                }, 2000);
               },
-              onClose: function () {
-                router.push(`/orders/${data.data.order.id}`);
+              onClose: async function () {
+                await syncStatus();
+                router.push(`/orders/${orderId}`);
+                router.refresh();
               }
             });
           } else {
@@ -153,6 +179,29 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
           <div className="text-headline-md font-headline-md text-primary">Rp {packageData.price.toLocaleString('id-ID')}</div>
         </div>
 
+        {/* Contact Information (Phone / WhatsApp) */}
+        <section className="flex flex-col gap-4">
+          <h2 className="text-headline-md font-headline-md text-on-surface">Informasi Kontak</h2>
+          <div>
+            <label htmlFor="phone" className="block text-label-md font-label-md uppercase text-[#7A7067] mb-2">
+              Nomor WhatsApp / Telepon <span className="text-[#9d4b36] font-bold">*</span>
+            </label>
+            <input
+              type="tel"
+              id="phone"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Contoh: 081234567890"
+              required
+              disabled={loading}
+              className="w-full bg-transparent border border-outline-variant focus:border-on-surface focus:ring-0 p-4 text-body-md font-body-md rounded-xl transition-colors disabled:opacity-50"
+            />
+            <p className="text-caption font-caption text-[#7A7067] mt-1">
+              Nomor ini digunakan untuk konfirmasi status pengerjaan, notifikasi pesanan, dan koordinasi dengan desainer/artis.
+            </p>
+          </div>
+        </section>
+
         {/* Brief Textarea */}
         <section className="flex flex-col gap-4">
           <h2 className="text-headline-md font-headline-md text-on-surface">Brief Commission</h2>
@@ -190,18 +239,19 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
           </div>
         </section>
 
-        {/* Character References */}
+        {/* Character / Design Asset References */}
         <section className="flex flex-col gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-headline-md font-headline-md text-on-surface">Referensi Karakter</h2>
+              <h2 className="text-headline-md font-headline-md text-on-surface">Referensi Karakter / Aset Desain</h2>
+              <span className="px-2 py-0.5 rounded-full bg-surface-container-highest text-on-surface-variant text-[10px] uppercase tracking-wider font-medium">Opsional</span>
             </div>
-            <p className="text-caption font-caption text-[#7A7067]">Unggah gambar karakter yang ingin digunakan. (Maks 3)</p>
+            <p className="text-caption font-caption text-[#7A7067]">Unggah gambar karakter atau aset visual yang ingin digunakan jika ada. (Maks 3)</p>
           </div>
 
           <ReferenceUploader
-            title="Referensi Karakter"
-            description="Unggah gambar karakter utama yang akan digunakan dalam desain. (Wajib)"
+            title="Referensi Karakter / Aset"
+            description="Unggah gambar karakter utama atau aset visual sebagai panduan desain. (Opsional)"
             maxFiles={3}
             images={characterRefs}
             setImages={setCharacterRefs}
@@ -288,11 +338,11 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
 
           {/* Thumbnail & Layanan */}
           <div className="flex items-center space-x-4 mb-6">
-            <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+            <div className="w-16 h-16 rounded-xl bg-gray-50 overflow-hidden flex items-center justify-center shrink-0 border border-gray-200">
               <img
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuC87nJt4UTWPv2ebTjdiihduGbbF1KtcDhTsTj5QDmjYWAc7U6Wr6NuFRnNc4ImRHFoqVZHfLQW9bKUDT2F-hP64tea6OcGO9tf5ioFIm_guNlMNp4qJS04fmI2Cti53NKq1Tu2XGu30corc3S8dcYpKNP7RGtRAi3Qy5-AwPsNUfOBJGosXsn2FKyP1j6kXCT7akni73-1yUj656v-xfYbl9_WR7Q2Zr-AAd7snMICqpWVI-ntsX5H_Q"
-                alt="Thumbnail"
-                className="w-full h-full object-cover"
+                src={thumbnailSrc}
+                alt={packageData?.name || "Thumbnail"}
+                className="w-full h-full object-cover object-center"
               />
             </div>
             <div>
@@ -350,15 +400,30 @@ export default function CheckoutForm({ packageData }: { packageData: any }) {
               id="terms-sidebar"
               checked={termsAccepted}
               onChange={(e) => setTermsAccepted(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded text-[#9d4b36] border-gray-300 focus:ring-[#9d4b36] cursor-pointer"
+              className="mt-0.5 w-4 h-4 rounded text-[#9d4b36] border-gray-300 focus:ring-[#9d4b36] cursor-pointer flex-shrink-0"
             />
-            <label htmlFor="terms-sidebar" className="cursor-pointer text-[11px] text-gray-500 text-left">
-              Dengan membuat pesanan, Anda menyetujui <a href="#" className="underline text-gray-700 hover:text-[#9d4b36]">Ketentuan Layanan</a> dan <a href="#" className="underline text-gray-700 hover:text-[#9d4b36]">Kebijakan Commission</a>.
-            </label>
+            <div className="text-[11px] text-gray-500 text-left">
+              <label htmlFor="terms-sidebar" className="cursor-pointer">
+                Dengan membuat pesanan, Anda menyetujui
+              </label>{" "}
+              <button 
+                type="button" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsTermsOpen(true);
+                }} 
+                className="underline cursor-pointer font-medium text-gray-700 hover:text-[#9d4b36]"
+              >
+                Ketentuan Layanan dan Kebijakan Commission
+              </button>.
+            </div>
           </div>
 
         </div>
       </div>
+
+      <TermsModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} />
     </div>
   );
 }

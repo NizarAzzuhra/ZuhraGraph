@@ -1,20 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../../../auth/[...nextauth]/route';
+import { requireAdminApi } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
 import { revalidatePath } from 'next/cache';
+import { CloudinaryStorageService } from '@/infrastructure/storage/CloudinaryStorageService';
 
 export const dynamic = 'force-dynamic';
 
+const storageService = new CloudinaryStorageService();
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || !session.user || (session.user as any).role !== 'ADMIN') {
-      return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 });
-    }
+    const { error } = await requireAdminApi();
+    if (error) return error;
 
     const { id: orderId } = await params;
     const formData = await req.formData();
@@ -24,19 +21,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ success: false, message: 'File artwork wajib disertakan.' }, { status: 400 });
     }
 
-    // Save the file securely to public/uploads/artworks/
+    // Upload artwork to Cloudinary
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "artworks");
-    await mkdir(uploadDir, { recursive: true });
-
-    const safeFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const uniqueFilename = `${Date.now()}-${safeFilename}`;
-    const filepath = path.join(uploadDir, uniqueFilename);
-
-    await writeFile(filepath, buffer);
-    const artworkUrl = `/uploads/artworks/${uniqueFilename}`;
+    const uploadResult = await storageService.uploadImage(buffer, 'artworks');
+    const artworkUrl = uploadResult.url;
 
     // Get order to determine current revision number
     const order = await prisma.order.findUnique({
@@ -80,6 +70,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Call revalidatePath for both admin and client order pages
     revalidatePath(`/admin/orders/${orderId}`);
     revalidatePath("/admin/orders");
+    revalidatePath("/admin");
     revalidatePath(`/orders/${orderId}`);
 
     return NextResponse.json({

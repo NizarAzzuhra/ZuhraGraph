@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { requireAdminApi } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { CloudinaryStorageService } from "@/infrastructure/storage/CloudinaryStorageService";
+
+const storageService = new CloudinaryStorageService();
 
 export async function GET() {
   try {
@@ -17,6 +19,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const { error } = await requireAdminApi();
+    if (error) return error;
+
     const formData = await request.formData();
     const title = formData.get("title") as string;
     const category = formData.get("category") as string;
@@ -29,15 +34,8 @@ export async function POST(request: Request) {
       const bytes = await image.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      const uploadDir = path.join(process.cwd(), "public", "uploads", "portfolio");
-      await mkdir(uploadDir, { recursive: true });
-
-      const safeFilename = image.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const uniqueFilename = `${Date.now()}-${safeFilename}`;
-      const filepath = path.join(uploadDir, uniqueFilename);
-
-      await writeFile(filepath, buffer);
-      imageUrl = `/uploads/portfolio/${uniqueFilename}`;
+      const uploadResult = await storageService.uploadImage(buffer, "portfolio");
+      imageUrl = uploadResult.url;
     }
 
     const newPortfolio = await prisma.portfolio.create({

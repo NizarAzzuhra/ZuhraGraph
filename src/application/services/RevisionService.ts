@@ -71,7 +71,14 @@ export class RevisionService {
       `Permintaan revisi baru untuk pesanan ${order.id} telah diajukan.`
     );
     if (this.notificationService.sendToAdmins) {
-      await this.notificationService.sendToAdmins('REVISION_REQUESTED', `Permintaan revisi baru diajukan untuk Pesanan #${order.id}`, `/admin/orders/${order.id}`);
+      try {
+        const buyer = await prisma.user.findUnique({ where: { id: order.buyerId } });
+        const buyerName = buyer?.name || 'Klien';
+        await this.notificationService.sendToAdmins('REVISION_REQUESTED', `Klien ${buyerName} mengajukan revisi untuk pesanan #${order.id}.`, `/admin/orders/${order.id}`);
+      } catch (e) {
+        console.error("Failed to fetch buyer for notification", e);
+        await this.notificationService.sendToAdmins('REVISION_REQUESTED', `Klien mengajukan revisi untuk pesanan #${order.id}.`, `/admin/orders/${order.id}`);
+      }
     }
 
     return request;
@@ -97,8 +104,13 @@ export class RevisionService {
     }
 
     if (approve) {
-      const { classification, extraFee, reason } = decisionData;
+      let { classification, extraFee, reason } = decisionData;
       
+      // Paksa extraFee = 0 jika kesalahan dari artis (ARTIST_ERROR) di level backend
+      if (classification === 'ARTIST_ERROR') {
+        extraFee = 0;
+      }
+
       const revisionCount = classification === 'MINOR_REVISION' ? 1 : 0;
       request.approve(classification, extraFee, revisionCount, reason);
       await this.revisionRequestRepository.save(request);
@@ -110,10 +122,11 @@ export class RevisionService {
           `Permintaan revisi Anda untuk pesanan ${order.id} membutuhkan BIAYA TAMBAHAN sebesar Rp ${extraFee.toLocaleString('id-ID')}. Silakan periksa detail pesanan Anda.`
         );
       } else {
+        const freeReason = classification === 'ARTIST_ERROR' ? ' karena merupakan koreksi kesalahan artist (bebas biaya)' : '';
         await this.notificationService.sendNotification(
           order.buyerId,
           'SYSTEM',
-          `Permintaan revisi Anda untuk pesanan ${order.id} telah DISETUJUI secara GRATIS.`
+          `Permintaan revisi Anda untuk pesanan ${order.id} telah DISETUJUI secara GRATIS${freeReason}.`
         );
       }
 

@@ -64,12 +64,6 @@ enum BuyerDecision {
   DECLINED
 }
 
-enum BriefEditStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
 enum RevisionClassification {
   ARTIST_ERROR
   MINOR_REVISION
@@ -91,11 +85,9 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
   deletedAt    DateTime?  @map("deleted_at")
 
-  orders              Order[]
-  notifications       Notification[]
-  activityDiscussions ActivityDiscussion[]
-  reviews             Review[]
-  auditLogs           AuditLog[]
+  orders        Order[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
 
   @@map("users")
 }
@@ -124,6 +116,7 @@ model Package {
   maxActiveSlots    Int        @default(3) @map("max_active_slots")
   isAcceptingOrders Boolean    @default(true) @map("is_accepting_orders")
   imageUrl          String?    @map("image_url")
+  features          String[]   @default([])
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt   DateTime   @updatedAt @map("updated_at")
   deletedAt   DateTime?  @map("deleted_at")
@@ -144,15 +137,12 @@ model Order {
   updatedAt   DateTime    @updatedAt @map("updated_at")
   deletedAt   DateTime?   @map("deleted_at")
 
-  buyer               User                 @relation(fields: [buyerId], references: [id])
-  package             Package              @relation(fields: [packageId], references: [id])
-  payments            Payment[]
-  revisionRequests    RevisionRequest[]
-  artworkVersions     ArtworkVersion[]
-  activityDiscussions ActivityDiscussion[]
-  statusHistories     OrderStatusHistory[]
-  review              Review?
-  briefEditRequests   BriefEditRequest[]
+  buyer            User                 @relation(fields: [buyerId], references: [id])
+  package          Package              @relation(fields: [packageId], references: [id])
+  payments         Payment[]
+  revisionRequests RevisionRequest[]
+  artworkVersions  ArtworkVersion[]
+  statusHistories  OrderStatusHistory[]
 
   @@index([buyerId])
   @@index([packageId])
@@ -218,23 +208,6 @@ model ArtworkVersion {
   @@map("artwork_versions")
 }
 
-model BriefEditRequest {
-  id            String          @id @default(uuid())
-  orderId       String          @map("order_id")
-  proposedBrief String          @db.Text
-  status        BriefEditStatus @default(PENDING)
-  reason        String?         @db.Text
-  createdAt     DateTime        @default(now()) @map("created_at")
-  updatedAt     DateTime        @updatedAt @map("updated_at")
-  deletedAt     DateTime?       @map("deleted_at")
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-  @@index([status])
-  @@map("brief_edit_requests")
-}
-
 model Notification {
   id        String             @id @default(uuid())
   userId    String             @map("user_id")
@@ -250,58 +223,6 @@ model Notification {
   @@index([userId])
   @@index([status])
   @@map("notifications")
-}
-
-model ActivityDiscussion {
-  id        String    @id @default(uuid())
-  orderId   String    @map("order_id")
-  userId    String    @map("user_id")
-  message   String
-  createdAt DateTime  @default(now()) @map("created_at")
-  deletedAt DateTime? @map("deleted_at")
-
-  order Order @relation(fields: [orderId], references: [id])
-  user  User  @relation(fields: [userId], references: [id])
-
-  @@index([orderId])
-  @@index([userId])
-  @@map("activity_discussions")
-}
-
-model Review {
-  id        String    @id @default(uuid())
-  orderId   String    @unique @map("order_id")
-  userId    String    @map("user_id")
-  rating    Int
-  feedback  String?
-  createdAt DateTime  @default(now()) @map("created_at")
-  deletedAt DateTime? @map("deleted_at")
-
-  order Order @relation(fields: [orderId], references: [id])
-  user  User  @relation(fields: [userId], references: [id])
-
-  @@map("reviews")
-}
-
-model Queue {
-  id          String   @id @default(uuid())
-  currentSlot Int      @default(0) @map("current_slot")
-  maxSlot     Int      @default(10) @map("max_slot")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  @@map("queues")
-}
-
-model FAQ {
-  id        String    @id @default(uuid())
-  question  String
-  answer    String
-  order     Int       @default(0)
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
-
-  @@map("faqs")
 }
 
 model OrderStatusHistory {

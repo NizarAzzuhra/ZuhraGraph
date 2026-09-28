@@ -12,6 +12,7 @@ interface PackageData {
   price: number;
   maxActiveSlots: number;
   imageUrl: string | null;
+  features: string[];
 }
 
 export default function EditPackageForm({ initialData }: { initialData: PackageData }) {
@@ -21,6 +22,11 @@ export default function EditPackageForm({ initialData }: { initialData: PackageD
     price: initialData.price.toString(),
     maxActiveSlots: initialData.maxActiveSlots.toString(),
   });
+  const [features, setFeatures] = useState<string[]>(
+    initialData.features && initialData.features.length > 0 
+      ? initialData.features 
+      : [""]
+  );
   const [image, setImage] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +40,22 @@ export default function EditPackageForm({ initialData }: { initialData: PackageD
     }
   };
 
+  const handleFeatureChange = (index: number, value: string) => {
+    const newFeatures = [...features];
+    newFeatures[index] = value;
+    setFeatures(newFeatures);
+  };
+
+  const addFeature = () => {
+    setFeatures([...features, ""]);
+  };
+
+  const removeFeature = (index: number) => {
+    const newFeatures = features.filter((_, i) => i !== index);
+    if (newFeatures.length === 0) newFeatures.push("");
+    setFeatures(newFeatures);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -44,6 +66,7 @@ export default function EditPackageForm({ initialData }: { initialData: PackageD
       formPayload.append("description", formData.description);
       formPayload.append("price", formData.price);
       formPayload.append("maxActiveSlots", formData.maxActiveSlots);
+      formPayload.append("features", JSON.stringify(features));
       if (image) {
         formPayload.append("image", image);
       }
@@ -131,6 +154,38 @@ export default function EditPackageForm({ initialData }: { initialData: PackageD
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               className="w-full bg-[#F4EFEA] border border-[#E8E0D5] rounded-xl px-4 py-3 text-[#1F1C18] focus:outline-none focus:border-[#9D4B36] transition-colors"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-[#1F1C18] mb-2 uppercase tracking-wider">Yang Anda Dapatkan / Fitur Paket</label>
+            <div className="space-y-3 mb-3">
+              {features.map((feature, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={feature}
+                    onChange={(e) => handleFeatureChange(index, e.target.value)}
+                    className="flex-1 bg-[#F4EFEA] border border-[#E8E0D5] rounded-xl px-4 py-3 text-[#1F1C18] focus:outline-none focus:border-[#9D4B36] transition-colors"
+                    placeholder="Contoh: 1 Karakter full render"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeFeature(index)}
+                    className="p-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">delete</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={addFeature}
+              className="flex items-center gap-2 text-[#9D4B36] font-semibold text-sm hover:bg-[#F4EFEA] px-3 py-2 rounded-lg transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">add</span>
+              Tambah Poin Fitur
+            </button>
           </div>
 
           <div className="grid grid-cols-2 gap-6">

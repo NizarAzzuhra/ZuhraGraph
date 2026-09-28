@@ -11,6 +11,30 @@ export type OrderStatus =
   | 'COMPLETED'
   | 'CANCELLED';
 
+export const VALID_ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  PENDING: ['AWAITING_PAYMENT', 'CANCELLED'],
+  AWAITING_PAYMENT: ['CANCELLED'], // Status PAID hanya boleh dicapai lewat gateway/webhook pembayaran
+  PAID: ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED: ['PROCESSING', 'CANCELLED'],
+  PROCESSING: ['ARTWORK_UPLOADED', 'CANCELLED'],
+  ARTWORK_UPLOADED: ['WAITING_BUYER_CONFIRMATION', 'PROCESSING', 'CANCELLED'],
+  WAITING_BUYER_CONFIRMATION: ['REVISION_REQUESTED', 'COMPLETED'],
+  REVISION_REQUESTED: ['PROCESSING_REVISION', 'WAITING_BUYER_CONFIRMATION', 'CANCELLED'],
+  PROCESSING_REVISION: ['ARTWORK_UPLOADED', 'WAITING_BUYER_CONFIRMATION', 'CANCELLED'],
+  COMPLETED: [],
+  CANCELLED: [],
+};
+
+export const ACTIVE_COMMISSION_STATUSES: OrderStatus[] = [
+  'PAID',
+  'CONFIRMED',
+  'PROCESSING',
+  'ARTWORK_UPLOADED',
+  'WAITING_BUYER_CONFIRMATION',
+  'REVISION_REQUESTED',
+  'PROCESSING_REVISION',
+];
+
 export class Order {
   public readonly id: string;
   public readonly buyerId: string;
@@ -123,6 +147,10 @@ export class Order {
   }
 
   public adminUpdateStatus(newStatus: OrderStatus): void {
+    const allowed = VALID_ORDER_STATUS_TRANSITIONS[this.status] || [];
+    if (!allowed.includes(newStatus)) {
+      throw new Error(`Transisi status tidak valid dari ${this.status} ke ${newStatus}.`);
+    }
     this.status = newStatus;
   }
 }

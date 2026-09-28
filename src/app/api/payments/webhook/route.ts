@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { MidtransPaymentGateway } from '../../../../infrastructure/payment/MidtransPaymentGateway';
 import { PrismaOrderRepository } from '../../../../infrastructure/repositories/PrismaOrderRepository';
 import { PrismaPaymentRepository } from '../../../../infrastructure/repositories/PrismaPaymentRepository';
@@ -6,29 +7,13 @@ import { PrismaPackageRepository } from '../../../../infrastructure/repositories
 import { OrderService } from '../../../../application/services/OrderService';
 import { PaymentService } from '../../../../application/services/PaymentService';
 
-// Mock Notification Service since real one is not yet implemented
-class RealNotificationService {
-  async sendNotification(userId: string, type: string, content: string) {
-    try {
-      const { prisma } = await import('../../../../lib/prisma');
-      await prisma.notification.create({
-        data: {
-          userId,
-          type: (['ORDER_CREATED', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'ORDER_CONFIRMED', 'ARTWORK_UPLOADED', 'REVISION_REQUESTED', 'ORDER_COMPLETED', 'REVIEW_SUBMITTED', 'SYSTEM'].includes(type) ? type : 'SYSTEM') as any,
-          content,
-          status: 'UNREAD',
-        }
-      });
-    } catch(e) { console.error("Notif Error:", e) }
-  }
-  async markAsRead(notificationId: string) {}
-}
+import { PrismaNotificationService } from '../../../../infrastructure/services/PrismaNotificationService';
 
 const paymentGateway = new MidtransPaymentGateway();
 const orderRepository = new PrismaOrderRepository();
 const paymentRepository = new PrismaPaymentRepository();
 const packageRepository = new PrismaPackageRepository();
-const notificationService = new RealNotificationService();
+const notificationService = new PrismaNotificationService();
 
 const orderService = new OrderService(
   orderRepository,
@@ -183,20 +168,32 @@ export async function POST(req: Request) {
         
         if (isOrderUpdateNeeded) {
           await notificationService.sendNotification(order.buyerId, 'PAYMENT_SUCCESS', `Payment for order ${order.id} was successful.`);
+          try {
+            const buyer = await prisma.user.findUnique({ where: { id: order.buyerId } });
+            const buyerName = buyer?.name || 'Klien';
+            await notificationService.sendToAdmins('PAYMENT_SUCCESS', `Pesanan #${order.id} dari ${buyerName} telah dibayar dan siap diproses.`, `/admin/orders/${order.id}`);
+          } catch(e) {
+            console.error("Failed to notify admins", e);
+          }
         }
 
         if (isRevisionUpdateNeeded) {
           await notificationService.sendNotification(order.buyerId, 'SYSTEM', `Pembayaran untuk revisi pesanan ${order.id} berhasil.`);
           // Notify admins
           try {
-            const admins = await prisma.user.findMany({ where: { role: 'ADMIN' } });
-            for (const admin of admins) {
-              await notificationService.sendNotification(admin.id, 'SYSTEM', `Pembeli telah membayar revisi untuk pesanan ${order.id}. Siap dikerjakan.`);
-            }
+            const buyer = await prisma.user.findUnique({ where: { id: order.buyerId } });
+            const buyerName = buyer?.name || 'Klien';
+            await notificationService.sendToAdmins('SYSTEM', `Klien ${buyerName} telah membayar revisi untuk pesanan #${order.id}. Siap dikerjakan.`, `/admin/orders/${order.id}`);
           } catch(e) {
             console.error("Failed to notify admins", e);
           }
         }
+
+        // Revalidate paths for admin and client pages
+        revalidatePath(`/admin/orders/${order.id}`);
+        revalidatePath('/admin/orders');
+        revalidatePath('/admin');
+        revalidatePath(`/orders/${order.id}`);
       }
       
     } else if (mappedStatus === 'FAILED') {

@@ -3,11 +3,15 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(req: NextRequest) {
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET || 'secret123' });
+  const token = await getToken({
+    req,
+    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  });
   const isAuth = !!token;
-  const isAuthPage = req.nextUrl.pathname === "/login" || req.nextUrl.pathname === "/register";
+  const pathname = req.nextUrl.pathname;
+  const isAuthPage = pathname === "/login" || pathname === "/register";
 
-  // Jika user sudah login dan mencoba mengakses halaman login/register, arahkan ke dashboard
+  // Jika user sudah login dan mencoba mengakses halaman login/register, arahkan ke beranda
   if (isAuthPage) {
     if (isAuth) {
       return NextResponse.redirect(new URL("/", req.url));
@@ -15,14 +19,21 @@ export async function middleware(req: NextRequest) {
     return null;
   }
 
-  // Jika user belum login dan mencoba mengakses halaman yang dilindungi
-  const isProtectedPage = req.nextUrl.pathname.startsWith("/orders");
-  
-  if (isProtectedPage && !isAuth) {
-    let from = req.nextUrl.pathname;
-    if (req.nextUrl.search) {
-      from += req.nextUrl.search;
+  // Proteksi rute Admin: Wajib login dan harus memiliki role ADMIN
+  if (pathname.startsWith("/admin")) {
+    if (!isAuth) {
+      const from = pathname + (req.nextUrl.search || "");
+      return NextResponse.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(from)}`, req.url));
     }
+    if ((token as any)?.role !== "ADMIN") {
+      return NextResponse.redirect(new URL("/", req.url));
+    }
+  }
+
+  // Proteksi rute pembeli: Wajib login
+  const isProtectedPage = pathname.startsWith("/orders");
+  if (isProtectedPage && !isAuth) {
+    const from = pathname + (req.nextUrl.search || "");
     return NextResponse.redirect(new URL(`/login?callbackUrl=${encodeURIComponent(from)}`, req.url));
   }
 
@@ -30,6 +41,6 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Hanya jalankan middleware pada rute-rute ini
-  matcher: ["/login", "/register", "/orders/:path*"]
+  // Jalankan middleware pada rute otentikasi, rute pembeli, dan rute admin
+  matcher: ["/login", "/register", "/orders/:path*", "/admin/:path*"]
 };

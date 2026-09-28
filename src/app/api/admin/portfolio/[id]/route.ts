@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
+import { requireAdminApi } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { CloudinaryStorageService } from "@/infrastructure/storage/CloudinaryStorageService";
+
+const storageService = new CloudinaryStorageService();
 
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { error } = await requireAdminApi();
+    if (error) return error;
+
     const { id } = await context.params;
     const formData = await request.formData();
     
@@ -27,15 +32,8 @@ export async function PATCH(
       const bytes = await image.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      const uploadDir = path.join(process.cwd(), "public", "uploads", "portfolio");
-      await mkdir(uploadDir, { recursive: true });
-
-      const safeFilename = image.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const uniqueFilename = `${Date.now()}-${safeFilename}`;
-      const filepath = path.join(uploadDir, uniqueFilename);
-      
-      await writeFile(filepath, buffer);
-      imageUrl = `/uploads/portfolio/${uniqueFilename}`;
+      const uploadResult = await storageService.uploadImage(buffer, "portfolio");
+      imageUrl = uploadResult.url;
     }
 
     const updateData: any = { 
@@ -53,6 +51,8 @@ export async function PATCH(
       data: updateData,
     });
 
+    revalidatePath("/admin/portfolio");
+    revalidatePath("/portofolio");
     revalidatePath("/portfolio");
     return NextResponse.json(updatedPortfolio);
   } catch (error: any) {
@@ -71,12 +71,17 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { error } = await requireAdminApi();
+    if (error) return error;
+
     const { id } = await context.params;
 
     await prisma.portfolio.delete({
       where: { id },
     });
 
+    revalidatePath("/admin/portfolio");
+    revalidatePath("/portofolio");
     revalidatePath("/portfolio");
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: any) {

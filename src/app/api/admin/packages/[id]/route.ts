@@ -1,15 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
+import { requireAdminApi } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { CloudinaryStorageService } from "@/infrastructure/storage/CloudinaryStorageService";
+
+const storageService = new CloudinaryStorageService();
 
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { error } = await requireAdminApi();
+    if (error) return error;
+
     // 1. Await params for Next.js 15+
     const { id } = await context.params;
 
@@ -22,25 +26,17 @@ export async function PATCH(
     
     // File can be null or a File object
     const image = formData.get("image") as File | null;
+    const featuresRaw = formData.get("features") as string;
 
     let imageUrl;
 
-    // 3. Handle File Upload Safely
+    // 3. Handle File Upload Safely via Cloudinary
     if (image && image.name && image.size > 0) {
       const bytes = await image.arrayBuffer();
       const buffer = Buffer.from(bytes);
 
-      // Ensure the target directory exists before writing
-      const uploadDir = path.join(process.cwd(), "public", "uploads", "packages");
-      await mkdir(uploadDir, { recursive: true });
-
-      // Clean filename and write
-      const safeFilename = image.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const uniqueFilename = `${Date.now()}-${safeFilename}`;
-      const filepath = path.join(uploadDir, uniqueFilename);
-      
-      await writeFile(filepath, buffer);
-      imageUrl = `/uploads/packages/${uniqueFilename}`;
+      const uploadResult = await storageService.uploadImage(buffer, "packages");
+      imageUrl = uploadResult.url;
     }
 
     // 4. Prepare Update Object
@@ -55,6 +51,20 @@ export async function PATCH(
       updateData.imageUrl = imageUrl;
     }
 
+    if (featuresRaw !== null) {
+      try {
+        const parsed = JSON.parse(featuresRaw);
+        if (Array.isArray(parsed)) {
+          const filteredFeatures = parsed.filter((f: string) => typeof f === 'string' && f.trim() !== '');
+          updateData.features = {
+            set: filteredFeatures
+          };
+        }
+      } catch (e) {
+        console.warn("Failed to parse features JSON");
+      }
+    }
+
     // 5. Update Database
     const updatedPackage = await prisma.package.update({
       where: { id },
@@ -62,6 +72,8 @@ export async function PATCH(
     });
 
     revalidatePath("/packages");
+    revalidatePath(`/packages/${id}`);
+    revalidatePath("/admin/packages");
 
     return NextResponse.json(updatedPackage);
   } catch (error: any) {
@@ -81,6 +93,9 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { error } = await requireAdminApi();
+    if (error) return error;
+
     const { id } = await context.params;
 
     // Gracefully handle constraints: check if package is used in any orders
@@ -97,6 +112,8 @@ export async function DELETE(
     });
 
     revalidatePath("/packages");
+    revalidatePath(`/packages/${id}`);
+    revalidatePath("/admin/packages");
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error: any) {

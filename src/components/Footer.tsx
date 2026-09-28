@@ -13,19 +13,24 @@ export function Footer() {
           © {new Date().getFullYear()} ZuhraGraph. All rights reserved. Premium Digital Art Commissions.
         </p>
       </div>
-      <div className="flex flex-col md:flex-row gap-6 md:gap-12">
-        <Link href="#" className="text-sm font-label-md text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors duration-300 outline-none focus:text-[var(--color-primary)]">
-          About the Artist
+      <div className="flex flex-wrap md:flex-row gap-6 md:gap-12 items-center">
+        <Link href="/portofolio" className="text-sm font-label-md text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors duration-300 outline-none focus:text-[var(--color-primary)]">
+          Portofolio
         </Link>
-        <Link href="#" className="text-sm font-label-md text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors duration-300 outline-none focus:text-[var(--color-primary)]">
-          Privacy Policy
+        <Link href="/packages" className="text-sm font-label-md text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors duration-300 outline-none focus:text-[var(--color-primary)]">
+          Paket Komisi
         </Link>
-        <Link href="#" className="text-sm font-label-md text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors duration-300 outline-none focus:text-[var(--color-primary)]">
-          Terms of Service
+        <Link href="/faq" className="text-sm font-label-md text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors duration-300 outline-none focus:text-[var(--color-primary)]">
+          FAQ & Panduan
         </Link>
-        <Link href="#" className="text-sm font-label-md text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors duration-300 outline-none focus:text-[var(--color-primary)]">
-          Contact
-        </Link>
+        <a 
+          href="https://mail.google.com/mail/?view=cm&fs=1&to=nizarazzuhra@gmail.com&su=Tanya%20Layanan%20Komisi%20-%20ZuhraGraph" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          className="text-sm font-label-md text-[var(--color-secondary)] hover:text-[var(--color-primary)] transition-colors duration-300 outline-none focus:text-[var(--color-primary)]"
+        >
+          Hubungi Artis
+        </a>
       </div>
       </div>
     </footer>

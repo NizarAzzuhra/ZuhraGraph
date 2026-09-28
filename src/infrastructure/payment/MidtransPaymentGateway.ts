@@ -3,13 +3,16 @@ import midtransClient from 'midtrans-client';
 
 export class MidtransPaymentGateway implements PaymentGateway {
   private snap: any;
+  private coreApi: any;
 
   constructor() {
-    this.snap = new midtransClient.Snap({
+    const config = {
       isProduction: process.env.MIDTRANS_ENVIRONMENT === 'production',
       serverKey: process.env.MIDTRANS_SERVER_KEY || 'dummy_server_key',
       clientKey: process.env.MIDTRANS_CLIENT_KEY || 'dummy_client_key'
-    });
+    };
+    this.snap = new midtransClient.Snap(config);
+    this.coreApi = new midtransClient.CoreApi(config);
   }
 
   public async initiatePayment(orderId: string, amount: number, buyerInfo: any, zuhraGraphOrderId: string): Promise<PaymentInitiationResult> {
@@ -63,19 +66,31 @@ export class MidtransPaymentGateway implements PaymentGateway {
     return hash === signature;
   }
 
-  public async getPaymentStatus(transactionId: string): Promise<{ transaction_status: string, transaction_id: string }> {
+  public async getPaymentStatus(transactionId: string): Promise<{ transaction_status: string, transaction_id: string, fraud_status?: string }> {
     try {
       const response = await this.snap.transaction.status(transactionId);
       return {
         transaction_status: response.transaction_status,
-        transaction_id: response.transaction_id || transactionId // Fallback to parameter just in case
+        transaction_id: response.transaction_id || transactionId, // Fallback to parameter just in case
+        fraud_status: response.fraud_status
       };
     } catch (error: any) {
       console.error('Midtrans getPaymentStatus error:', error);
-      if (error.httpStatusCode === 404 || (error.message && error.message.includes('404'))) {
+      if (error.httpStatusCode === 404 || error.httpStatusCode === '404' || (error.message && error.message.includes('404'))) {
         throw new Error('Midtrans_404');
       }
       throw new Error('Midtrans_Network_Error');
     }
+  }
+
+  public async refundPayment(transactionId: string, parameter: { refund_key?: string; amount?: number; reason?: string }): Promise<any> {
+    const payload: any = {
+      refund_key: parameter.refund_key || `refund-${Date.now()}`,
+      reason: parameter.reason || 'Admin requested refund'
+    };
+    if (parameter.amount !== undefined && parameter.amount !== null) {
+      payload.amount = parameter.amount;
+    }
+    return await this.coreApi.transaction.refund(transactionId, payload);
   }
 }
