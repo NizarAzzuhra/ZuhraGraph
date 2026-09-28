@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { OrderService } from '../../../../../application/services/OrderService';
@@ -44,6 +45,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     await orderService.completeOrder(orderId);
+
+    // Revalidate paths for admin and client pages
+    revalidatePath(`/admin/orders/${orderId}`);
+    revalidatePath('/admin/orders');
+    revalidatePath('/admin');
+    revalidatePath(`/orders/${orderId}`);
 
     return NextResponse.json({
       success: true,

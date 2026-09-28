@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { MidtransPaymentGateway } from '../../../../infrastructure/payment/MidtransPaymentGateway';
 import { PrismaOrderRepository } from '../../../../infrastructure/repositories/PrismaOrderRepository';
 import { PrismaPaymentRepository } from '../../../../infrastructure/repositories/PrismaPaymentRepository';
@@ -187,6 +188,12 @@ export async function POST(req: Request) {
             console.error("Failed to notify admins", e);
           }
         }
+
+        // Revalidate paths for admin and client pages
+        revalidatePath(`/admin/orders/${order.id}`);
+        revalidatePath('/admin/orders');
+        revalidatePath('/admin');
+        revalidatePath(`/orders/${order.id}`);
       }
       
     } else if (mappedStatus === 'FAILED') {

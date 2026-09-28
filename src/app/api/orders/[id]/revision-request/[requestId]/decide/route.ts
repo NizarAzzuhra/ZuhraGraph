@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { requireAdminApi } from '@/lib/auth';
 import { RevisionService } from '../../../../../../../application/services/RevisionService';
 import { PrismaOrderRepository } from '../../../../../../../infrastructure/repositories/PrismaOrderRepository';
@@ -40,7 +41,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { error } = await requireAdminApi();
     if (error) return error;
 
-    const { requestId } = await params;
+    const { id, requestId } = await params;
     const payload = await req.json();
     console.log("APPROVE REVISION PAYLOAD:", payload);
     const { approve, classification, extraFee, reason } = payload;
@@ -71,6 +72,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       extraFee: parsedExtraFee,
       reason
     });
+
+    // Revalidate paths for admin and client pages
+    revalidatePath(`/admin/orders/${id}`);
+    revalidatePath('/admin/orders');
+    revalidatePath('/admin');
+    revalidatePath(`/orders/${id}`);
 
     return NextResponse.json({
       success: true,

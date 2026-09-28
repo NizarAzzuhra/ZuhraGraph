@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ConfirmationModal from "@/components/ui/ConfirmationModal";
 
@@ -30,6 +30,12 @@ export default function OrderStatusUpdater({ orderId, currentStatus }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+
+  // Sinkronkan state lokal saat prop currentStatus berubah dari hasil refresh/polling server
+  useEffect(() => {
+    setStatus(currentStatus);
+    setConfirmedStatus(currentStatus);
+  }, [currentStatus]);
 
   const availableNextStatuses = VALID_TRANSITIONS[confirmedStatus] || [];
   const isTerminal = availableNextStatuses.length === 0;

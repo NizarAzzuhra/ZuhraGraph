@@ -70,6 +70,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Call revalidatePath for both admin and client order pages
     revalidatePath(`/admin/orders/${orderId}`);
     revalidatePath("/admin/orders");
+    revalidatePath("/admin");
     revalidatePath(`/orders/${orderId}`);
 
     return NextResponse.json({

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { OrderStatus } from "@prisma/client";
 import { requireAdminPage } from "@/lib/auth";
+import AdminAutoRefresher from "@/components/admin/AdminAutoRefresher";
 
 export default async function AdminDashboardPage() {
   await requireAdminPage();
@@ -47,6 +48,8 @@ export default async function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Auto-refresh polling: polls every 10 seconds to keep metrics & recent orders fresh */}
+      <AdminAutoRefresher intervalMs={10000} />
       
       {/* Header Section */}
       <div>

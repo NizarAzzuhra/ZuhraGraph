@@ -59,6 +59,29 @@ export default function AdminOrdersPage() {
   const [filter, setFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const fetchOrders = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`/api/orders?t=${Date.now()}`, { cache: 'no-store' });
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Gagal memuat pesanan');
+      }
+      
+      setOrders(data.data || []);
+    } catch (err: any) {
+      if (showLoading) {
+        setError(err.message || 'Terjadi kesalahan jaringan.');
+      }
+    } finally {
+      if (showLoading) {
+        setLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     if (sessionStatus === 'unauthenticated') {
       router.push('/login');
@@ -70,28 +93,17 @@ export default function AdminOrdersPage() {
         router.push('/'); // Redirect non-admins
         return;
       }
-      fetchOrders();
+      fetchOrders(true);
+
+      // Polling otomatis setiap 10 detik agar data pesanan tetap segar
+      const interval = setInterval(() => {
+        fetchOrders(false);
+        router.refresh();
+      }, 10000);
+
+      return () => clearInterval(interval);
     }
   }, [sessionStatus, router, session]);
-
-  const fetchOrders = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const res = await fetch('/api/orders');
-      const data = await res.json();
-      
-      if (!res.ok) {
-        throw new Error(data.message || 'Gagal memuat pesanan');
-      }
-      
-      setOrders(data.data || []);
-    } catch (err: any) {
-      setError(err.message || 'Terjadi kesalahan jaringan.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filteredOrders = orders.filter(order => {
     if (filter === 'WAITING' && !['PENDING', 'AWAITING_PAYMENT', 'WAITING_BUYER_CONFIRMATION'].includes(order.status)) return false;
@@ -183,7 +195,7 @@ export default function AdminOrdersPage() {
         <div className="bg-red-50 text-red-800 p-6 rounded border border-red-200 text-center max-w-xl mx-auto">
           <p className="mb-4">{error}</p>
           <button 
-            onClick={fetchOrders}
+            onClick={() => fetchOrders(true)}
             className="bg-white border border-red-200 text-red-800 px-4 py-2 rounded text-sm font-medium hover:bg-red-100 transition-colors"
           >
             Coba Lagi

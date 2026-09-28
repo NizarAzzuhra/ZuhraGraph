@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
@@ -67,6 +68,11 @@ export class OrderController {
 
       const result = await orderService.createOrder(buyerId, packageId, brief, buyerInfo);
       
+      // Revalidate admin order lists and dashboard
+      revalidatePath('/admin');
+      revalidatePath('/admin/orders');
+      revalidatePath('/orders');
+
       return NextResponse.json({
         success: true,
         data: result

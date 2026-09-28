@@ -3,6 +3,7 @@ import { requireAdminPage } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import OrderStatusUpdater from "@/components/admin/OrderStatusUpdater";
+import AdminAutoRefresher from "@/components/admin/AdminAutoRefresher";
 import AdminArtworkUploadForm from "./AdminArtworkUploadForm";
 import AdminRevisionActions from "./AdminRevisionActions";
 
@@ -54,6 +55,9 @@ export default async function AdminOrderDetailPage(props: { params: Promise<{ id
 
   return (
     <div className="max-w-[var(--spacing-container-max)] mx-auto px-6 md:px-[var(--spacing-gutter)] py-12">
+      {/* Auto-refresh polling: polls every 10 seconds to keep server data fresh */}
+      <AdminAutoRefresher intervalMs={10000} />
+
       <Link href="/admin/orders" className="inline-flex items-center text-sm font-medium text-[var(--color-secondary)] hover:text-[var(--color-primary)] mb-6 transition-colors">
         <span className="material-symbols-outlined text-sm mr-1">arrow_back</span>
         Kembali ke Pesanan

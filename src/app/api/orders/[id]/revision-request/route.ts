@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { RevisionService } from '../../../../../application/services/RevisionService';
@@ -38,6 +39,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     }
 
     const request = await revisionService.requestRevision(buyerId, orderId, description, artworkVersionId);
+
+    // Revalidate paths for admin and client pages
+    revalidatePath(`/admin/orders/${orderId}`);
+    revalidatePath('/admin/orders');
+    revalidatePath('/admin');
+    revalidatePath(`/orders/${orderId}`);
 
     return NextResponse.json({
       success: true,

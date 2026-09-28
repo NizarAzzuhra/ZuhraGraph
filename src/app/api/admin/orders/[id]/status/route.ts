@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAdminApi } from "@/lib/auth";
 import { OrderService } from "@/application/services/OrderService";
 import { PrismaOrderRepository } from "@/infrastructure/repositories/PrismaOrderRepository";
@@ -40,6 +41,12 @@ export async function PATCH(
     }
 
     const updatedOrder = await orderService.updateOrderStatus(id, status as OrderStatus, adminId);
+
+    // Revalidate paths for admin and client pages
+    revalidatePath(`/admin/orders/${id}`);
+    revalidatePath('/admin/orders');
+    revalidatePath('/admin');
+    revalidatePath(`/orders/${id}`);
 
     return NextResponse.json({
       success: true,
